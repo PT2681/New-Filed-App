@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Map, Calendar, Navigation, CheckCircle2, DollarSign, Clock, AlertCircle } from 'lucide-react';
 import { Button } from '../components/FormElements';
 import { TourStartModal } from '../components/TourStartModal';
+import { ExpenseClaimModal } from '../components/ExpenseClaimModal';
 import { Tour, RoutePath } from '../types'; 
 import { MOCK_TOURS as INITIAL_TOURS } from '../constants'; 
 
@@ -13,6 +14,7 @@ export const ToursPage: React.FC = () => {
   
   // Modal State
   const [startModalOpen, setStartModalOpen] = useState(false);
+  const [claimModalOpen, setClaimModalOpen] = useState(false);
   const [selectedTour, setSelectedTour] = useState<Tour | null>(null);
 
   useEffect(() => {
@@ -49,16 +51,25 @@ export const ToursPage: React.FC = () => {
   };
 
   const handleClaimClick = (tour: Tour) => {
-    const confirm = window.confirm(`Claim expenses for ${tour.projectName}?`);
-    if (confirm) {
-        const updated = tours.map(t => t.id === tour.id ? {
-            ...t,
-            status: 'Claimed' as const,
-            claimStatus: 'Due' as const,
-            claimAmount: 850 // Mock calc
-        } : t);
-        saveTours(updated);
-    }
+    setSelectedTour(tour);
+    setClaimModalOpen(true);
+  };
+
+  const handleClaimSuccess = (totalAmount: number, breakdown: any) => {
+    if (!selectedTour) return;
+    
+    // In a real app, you might save the breakdown to a separate 'expenses' collection.
+    // Here we just update the tour status and amount.
+    const updated = tours.map(t => t.id === selectedTour.id ? {
+      ...t,
+      status: 'Claimed' as const,
+      claimStatus: 'Due' as const,
+      claimAmount: totalAmount
+    } : t);
+    
+    saveTours(updated);
+    setClaimModalOpen(false);
+    setSelectedTour(null);
   };
 
   const filteredTours = tours.filter(t => {
@@ -153,10 +164,14 @@ export const ToursPage: React.FC = () => {
                         <Calendar className="w-3.5 h-3.5 text-slate-400" />
                         <span>{new Date(tour.startDate).toLocaleDateString()}</span>
                     </div>
-                    {tour.advanceAmount && (
+                    {(tour.advanceAmount || tour.claimAmount) && (
                          <div className="flex items-center gap-2 text-xs text-slate-600">
                             <DollarSign className="w-3.5 h-3.5 text-slate-400" />
-                            <span>Adv: ${tour.advanceAmount}</span>
+                            {activeTab === 'CLAIMED' ? (
+                              <span className="font-bold text-slate-900">Claim: ₹{tour.claimAmount}</span>
+                            ) : (
+                              <span>Adv: ₹{tour.advanceAmount || 0}</span>
+                            )}
                         </div>
                     )}
                 </div>
@@ -188,13 +203,23 @@ export const ToursPage: React.FC = () => {
         ))}
       </div>
 
-      {/* Modals */}
+      {/* Start Modal */}
       {selectedTour && (
           <TourStartModal 
             isOpen={startModalOpen}
             tour={selectedTour}
             onClose={() => { setStartModalOpen(false); setSelectedTour(null); }}
             onSuccess={handleTourStarted}
+          />
+      )}
+
+      {/* Expense Claim Modal */}
+      {selectedTour && (
+          <ExpenseClaimModal
+            isOpen={claimModalOpen}
+            tour={selectedTour}
+            onClose={() => { setClaimModalOpen(false); setSelectedTour(null); }}
+            onSuccess={handleClaimSuccess}
           />
       )}
     </div>
