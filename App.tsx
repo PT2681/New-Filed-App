@@ -8,6 +8,7 @@ import { ProfilePage } from './pages/ProfilePage';
 import { ProjectsPage } from './pages/ProjectsPage';
 import { ProjectDetailsPage } from './pages/ProjectDetailsPage';
 import { TrainingPage } from './pages/TrainingPage';
+import { TrainingDetailsPage } from './pages/TrainingDetailsPage';
 import { ToursPage } from './pages/ToursPage';
 import { ActiveTourPage } from './pages/ActiveTourPage';
 import { NotificationsPage } from './pages/NotificationsPage';
@@ -42,6 +43,7 @@ const AppRoutes: React.FC = () => {
       <Route path={RoutePath.PROJECTS} element={<ProjectsPage />} />
       <Route path={RoutePath.PROJECT_DETAILS} element={<ProjectDetailsPage />} />
       <Route path={RoutePath.TRAINING} element={<TrainingPage />} />
+      <Route path={RoutePath.TRAINING_DETAILS} element={<TrainingDetailsPage />} />
       <Route path={RoutePath.TOURS} element={<ToursPage />} />
       <Route path={RoutePath.ACTIVE_TOUR} element={<ActiveTourPage />} />
       <Route path={RoutePath.NOTIFICATIONS} element={<NotificationsPage />} />

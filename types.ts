@@ -13,6 +13,7 @@ export enum RoutePath {
   PROJECTS = '/projects',
   PROJECT_DETAILS = '/projects/:id',
   TRAINING = '/training',
+  TRAINING_DETAILS = '/training/:id',
   TOURS = '/tours',
   ACTIVE_TOUR = '/tours/:id/active',
   NOTIFICATIONS = '/notifications',

@@ -79,17 +79,13 @@ export const TourEndModal: React.FC<TourEndModalProps> = ({
         return;
       }
 
-      // If we are ending trip, we technically check if they are back at origin, 
-      // but 'fromLocation' in mock data is string only. 
-      // For demo, we skip distance check for 'RETURN' phase or assume success.
-      
       const targetLat = phase === 'RETURN' ? current.lat : tour.toCoordinates.lat;
       const targetLng = phase === 'RETURN' ? current.lng : tour.toCoordinates.lng;
 
       const dist = calculateDistance(current.lat, current.lng, targetLat, targetLng);
       setDistance(Math.round(dist));
 
-      // 20km radius for demo purposes
+      // 20km radius for demo purposes (Wide radius for easy testing)
       if (dist <= 20000) { 
          setTimeout(() => {
              setStep('SELFIE');

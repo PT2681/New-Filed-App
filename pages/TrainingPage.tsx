@@ -95,6 +95,22 @@ export const TrainingPage: React.FC = () => {
     setSelectedSession(null);
   };
 
+  // Helper to calculate duration
+  const calculateDuration = (start?: string, end?: string) => {
+    if (!start || !end) return 'N/A';
+    const startTime = new Date(start).getTime();
+    const endTime = new Date(end).getTime();
+    const diff = endTime - startTime;
+
+    if (diff < 0) return '0m';
+
+    const hours = Math.floor(diff / (1000 * 60 * 60));
+    const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+
+    if (hours > 0) return `${hours}h ${minutes}m`;
+    return `${minutes}m`;
+  };
+
   // Filter Logic
   const filteredSessions = sessions.filter(session => {
     // 1. Role Check
@@ -265,41 +281,59 @@ export const TrainingPage: React.FC = () => {
               </div>
 
               {/* Actions */}
-              {activeSubTab === 'UPCOMING' && (
-                <div className="pt-2">
-                  {session.status === 'In Progress' ? (
-                     <Button variant="danger" onClick={() => handleEndSession(session)}>
-                        <StopCircle className="w-4 h-4" /> End Session
-                     </Button>
-                  ) : (
-                    <Button 
-                      disabled={!isToday(session.startDate)} // Only active on respective date
-                      className={!isToday(session.startDate) ? "opacity-50" : ""}
-                      onClick={() => handleStartSession(session)}
-                    >
-                      <PlayCircle className="w-4 h-4" /> Start Session
-                    </Button>
-                  )}
-                  {!isToday(session.startDate) && session.status === 'Due' && (
-                    <p className="text-center text-[10px] text-slate-400 mt-2">
-                      Session can only be started on the scheduled date.
+              <div className="pt-2 flex flex-col gap-2">
+                 {activeSubTab === 'UPCOMING' && (
+                    <div className="flex gap-3">
+                        <button 
+                            onClick={() => navigate(RoutePath.TRAINING_DETAILS.replace(':id', session.id))}
+                            className="flex-1 py-3 rounded-xl border border-slate-200 text-slate-600 font-semibold text-sm hover:bg-slate-50 transition-colors"
+                        >
+                            View Details
+                        </button>
+                        <div className="flex-1">
+                            {session.status === 'In Progress' ? (
+                                <Button variant="danger" onClick={() => handleEndSession(session)}>
+                                    <StopCircle className="w-4 h-4" /> End
+                                </Button>
+                            ) : (
+                                <Button 
+                                    disabled={!isToday(session.startDate)} 
+                                    className={!isToday(session.startDate) ? "opacity-50" : ""}
+                                    onClick={() => handleStartSession(session)}
+                                >
+                                    <PlayCircle className="w-4 h-4" /> Start
+                                </Button>
+                            )}
+                        </div>
+                    </div>
+                 )}
+                 
+                 {activeSubTab === 'UPCOMING' && !isToday(session.startDate) && session.status === 'Due' && (
+                    <p className="text-center text-[10px] text-slate-400">
+                      Scheduled for {new Date(session.startDate).toLocaleDateString()}
                     </p>
                   )}
-                </div>
-              )}
               
-              {activeSubTab === 'COMPLETED' && (
-                 <div className="pt-3 border-t border-slate-50 flex flex-col gap-2">
-                    <div className="flex justify-between items-center text-xs text-slate-500">
-                        <span>Ended: {session.actualEndTime ? new Date(session.actualEndTime).toLocaleTimeString() : '-'}</span>
-                    </div>
-                    {session.remarks && (
-                        <div className="bg-slate-50 p-2 rounded text-xs text-slate-600 italic">
-                            "{session.remarks}"
+                  {activeSubTab === 'COMPLETED' && (
+                     <div className="pt-2 border-t border-slate-50 flex flex-col gap-2">
+                        <div className="flex justify-between items-center text-xs text-slate-500">
+                            <span>Ended: {session.actualEndTime ? new Date(session.actualEndTime).toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'}) : '-'}</span>
+                            {session.actualStartTime && session.actualEndTime && (
+                              <div className="flex items-center gap-1 font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded">
+                                 <Clock className="w-3 h-3" />
+                                 {calculateDuration(session.actualStartTime, session.actualEndTime)}
+                              </div>
+                            )}
                         </div>
-                    )}
-                 </div>
-              )}
+                        <button 
+                            onClick={() => navigate(RoutePath.TRAINING_DETAILS.replace(':id', session.id))}
+                            className="w-full py-2 mt-1 rounded-lg bg-slate-50 text-slate-600 font-semibold text-xs hover:bg-slate-100 transition-colors"
+                        >
+                            View Full Report
+                        </button>
+                     </div>
+                  )}
+              </div>
 
             </div>
           ))

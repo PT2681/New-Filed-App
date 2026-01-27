@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, MapPin, Navigation, Clock, StopCircle, Car, Bike, Bus, Building2, Undo2, Flag } from 'lucide-react';
+import { ArrowLeft, MapPin, Clock, Car, Bike, Bus, Building2, Undo2, Flag } from 'lucide-react';
 import { Button } from '../components/FormElements';
 import { TourEndModal } from '../components/TourEndModal';
 import { Tour, RoutePath, TourPhase } from '../types';
