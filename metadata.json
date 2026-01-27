@@ -1,0 +1,8 @@
+{
+  "name": "Nexby Field-Force Pro",
+  "description": "Core layout and structure for a modular mobile web application. Features a responsive design, navigation, and placeholder slots for future AI integrations.",
+  "requestFramePermissions": [
+    "camera",
+    "geolocation"
+  ]
+}
