@@ -81,6 +81,7 @@ export interface TrainingSession {
 
 export type TourStatus = 'Upcoming' | 'In Progress' | 'Completed' | 'Claimed';
 export type ClaimStatus = 'Paid' | 'Due';
+export type AdvanceStatus = 'Pending' | 'Approved' | 'Rejected';
 export type TransportMode = 'Bike' | 'Car' | 'Bus';
 export type TravelType = 'Individual' | 'Pool';
 export type PoolRole = 'Driver' | 'Passenger';
@@ -98,7 +99,11 @@ export interface Tour {
   startDate: string; // Scheduled start
   endDate: string; // Scheduled end
   status: TourStatus;
+  
+  // Advance Details
   advanceAmount?: number;
+  advanceStatus?: AdvanceStatus;
+  advanceReason?: string;
   
   // Execution Details
   tourPhase?: TourPhase; // New field
@@ -126,7 +131,7 @@ export interface Tour {
   claimAmount?: number;
 }
 
-export type NotificationType = 'PROJECT_ASSIGNED' | 'TRAINING_ASSIGNED' | 'CLAIM_PAID' | 'LEAVE_UPDATE' | 'GENERAL';
+export type NotificationType = 'PROJECT_ASSIGNED' | 'TRAINING_ASSIGNED' | 'CLAIM_PAID' | 'LEAVE_UPDATE' | 'ADVANCE_UPDATE' | 'GENERAL';
 
 export interface Notification {
   id: string;

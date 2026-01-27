@@ -180,7 +180,7 @@ export const MOCK_TRAINING_SESSIONS: TrainingSession[] = [
     locationCoords: { lat: 37.7949, lng: -122.3994 },
     role: 'TRAINER',
     status: 'Completed',
-  }
+  },
 ];
 
 export const MOCK_TOURS: Tour[] = [
@@ -195,7 +195,8 @@ export const MOCK_TOURS: Tour[] = [
     startDate: todayAt(8),
     endDate: todayAt(18),
     status: 'Upcoming',
-    advanceAmount: 500
+    advanceAmount: 500,
+    advanceStatus: 'Approved'
   },
   {
     id: 'TR-002',

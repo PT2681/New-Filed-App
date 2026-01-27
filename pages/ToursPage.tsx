@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Map, Calendar, Navigation, CheckCircle2, DollarSign, Clock, AlertCircle } from 'lucide-react';
+import { ArrowLeft, Map, Calendar, Navigation, CheckCircle2, DollarSign, Clock, AlertCircle, Wallet } from 'lucide-react';
 import { Button } from '../components/FormElements';
 import { TourStartModal } from '../components/TourStartModal';
 import { ExpenseClaimModal } from '../components/ExpenseClaimModal';
-import { Tour, RoutePath } from '../types'; 
-import { MOCK_TOURS as INITIAL_TOURS } from '../constants'; 
+import { AdvanceRequestModal } from '../components/AdvanceRequestModal';
+import { Tour, RoutePath, Notification } from '../types'; 
+import { MOCK_TOURS as INITIAL_TOURS, MOCK_NOTIFICATIONS } from '../constants'; 
 
 export const ToursPage: React.FC = () => {
   const navigate = useNavigate();
@@ -15,6 +16,7 @@ export const ToursPage: React.FC = () => {
   // Modal State
   const [startModalOpen, setStartModalOpen] = useState(false);
   const [claimModalOpen, setClaimModalOpen] = useState(false);
+  const [advanceModalOpen, setAdvanceModalOpen] = useState(false);
   const [selectedTour, setSelectedTour] = useState<Tour | null>(null);
 
   useEffect(() => {
@@ -58,8 +60,6 @@ export const ToursPage: React.FC = () => {
   const handleClaimSuccess = (totalAmount: number, breakdown: any) => {
     if (!selectedTour) return;
     
-    // In a real app, you might save the breakdown to a separate 'expenses' collection.
-    // Here we just update the tour status and amount.
     const updated = tours.map(t => t.id === selectedTour.id ? {
       ...t,
       status: 'Claimed' as const,
@@ -70,6 +70,60 @@ export const ToursPage: React.FC = () => {
     saveTours(updated);
     setClaimModalOpen(false);
     setSelectedTour(null);
+  };
+
+  // --- Advance Request Logic ---
+
+  const handleAdvanceClick = (tour: Tour) => {
+    setSelectedTour(tour);
+    setAdvanceModalOpen(true);
+  };
+
+  const handleAdvanceSuccess = (amount: number, reason: string) => {
+    if (!selectedTour) return;
+
+    // 1. Set status to Pending immediately
+    const updatedTours = tours.map(t => t.id === selectedTour.id ? {
+      ...t,
+      advanceAmount: amount,
+      advanceStatus: 'Pending' as const,
+      advanceReason: reason
+    } : t);
+    
+    saveTours(updatedTours);
+    setAdvanceModalOpen(false);
+    
+    const tourId = selectedTour.id;
+    const project = selectedTour.projectName;
+    setSelectedTour(null);
+
+    // 2. Simulate Admin Approval after 3 seconds
+    setTimeout(() => {
+       // Fetch latest state from LS to avoid stale closure issues
+       const currentTours: Tour[] = JSON.parse(localStorage.getItem('tours_data') || '[]');
+       const newTours = currentTours.map(t => t.id === tourId ? {
+         ...t,
+         advanceStatus: 'Approved' as const
+       } : t);
+       
+       localStorage.setItem('tours_data', JSON.stringify(newTours));
+       setTours(newTours); // Update local state if component is mounted
+
+       // Add Notification
+       const savedNotifs = localStorage.getItem('notifications');
+       const existingNotifs: Notification[] = savedNotifs ? JSON.parse(savedNotifs) : MOCK_NOTIFICATIONS;
+       const newNotif: Notification = {
+          id: `n-${Date.now()}`,
+          type: 'ADVANCE_UPDATE',
+          title: 'Advance Request Approved',
+          message: `Your advance request of ₹${amount} for "${project}" has been approved.`,
+          timestamp: new Date().toISOString(),
+          read: false,
+          route: RoutePath.TOURS
+       };
+       localStorage.setItem('notifications', JSON.stringify([newNotif, ...existingNotifs]));
+
+    }, 3000);
   };
 
   const filteredTours = tours.filter(t => {
@@ -164,39 +218,65 @@ export const ToursPage: React.FC = () => {
                         <Calendar className="w-3.5 h-3.5 text-slate-400" />
                         <span>{new Date(tour.startDate).toLocaleDateString()}</span>
                     </div>
-                    {(tour.advanceAmount || tour.claimAmount) && (
-                         <div className="flex items-center gap-2 text-xs text-slate-600">
-                            <DollarSign className="w-3.5 h-3.5 text-slate-400" />
-                            {activeTab === 'CLAIMED' ? (
+                    {/* Display Advance Status */}
+                    <div className="flex items-center gap-2 text-xs text-slate-600">
+                        <DollarSign className="w-3.5 h-3.5 text-slate-400" />
+                        {activeTab === 'CLAIMED' ? (
                               <span className="font-bold text-slate-900">Claim: ₹{tour.claimAmount}</span>
-                            ) : (
-                              <span>Adv: ₹{tour.advanceAmount || 0}</span>
-                            )}
-                        </div>
-                    )}
+                        ) : (
+                              <>
+                                {tour.advanceStatus === 'Pending' && <span className="text-amber-600 font-semibold">Adv. Pending</span>}
+                                {tour.advanceStatus === 'Approved' && <span className="text-green-600 font-semibold">Adv: ₹{tour.advanceAmount}</span>}
+                                {(!tour.advanceStatus || tour.advanceStatus === 'Rejected') && <span className="text-slate-400">No Advance</span>}
+                              </>
+                        )}
+                    </div>
                 </div>
 
                 {/* Actions */}
-                <div className="ml-3 pt-2">
+                <div className="ml-3 pt-2 flex items-center justify-between gap-2">
+                    <div className="flex-1">
+                        {activeTab === 'UPCOMING' && tour.status === 'Upcoming' && (
+                            <Button onClick={() => handleStartClick(tour)}>
+                                <Navigation className="w-4 h-4" /> Start Trip
+                            </Button>
+                        )}
+                        {activeTab === 'UPCOMING' && tour.status === 'In Progress' && (
+                            <Button variant="primary" onClick={() => handleTrackClick(tour)}>
+                                <Map className="w-4 h-4" /> Track Trip
+                            </Button>
+                        )}
+                        {activeTab === 'COMPLETED' && (
+                            <Button onClick={() => handleClaimClick(tour)} variant="outline">
+                                <DollarSign className="w-4 h-4" /> Claim Expenses
+                            </Button>
+                        )}
+                        {activeTab === 'CLAIMED' && (
+                            <p className="text-center text-xs text-slate-400 italic">
+                                Claim submitted on {new Date().toLocaleDateString()}
+                            </p>
+                        )}
+                    </div>
+
+                    {/* Request Advance Button Logic */}
                     {activeTab === 'UPCOMING' && tour.status === 'Upcoming' && (
-                        <Button onClick={() => handleStartClick(tour)}>
-                            <Navigation className="w-4 h-4" /> Start Trip
-                        </Button>
-                    )}
-                    {activeTab === 'UPCOMING' && tour.status === 'In Progress' && (
-                        <Button variant="primary" onClick={() => handleTrackClick(tour)}>
-                             <Map className="w-4 h-4" /> Track Trip
-                        </Button>
-                    )}
-                    {activeTab === 'COMPLETED' && (
-                        <Button onClick={() => handleClaimClick(tour)} variant="outline">
-                            <DollarSign className="w-4 h-4" /> Claim Expenses
-                        </Button>
-                    )}
-                    {activeTab === 'CLAIMED' && (
-                        <p className="text-center text-xs text-slate-400 italic">
-                            Claim submitted on {new Date().toLocaleDateString()}
-                        </p>
+                        !tour.advanceStatus ? (
+                            <button 
+                                onClick={() => handleAdvanceClick(tour)}
+                                className="p-3 rounded-xl border border-indigo-100 bg-indigo-50 text-indigo-600 hover:bg-indigo-100 transition-colors"
+                                title="Request Advance"
+                            >
+                                <Wallet className="w-5 h-5" />
+                            </button>
+                        ) : tour.advanceStatus === 'Pending' ? (
+                             <div className="p-3 rounded-xl bg-amber-50 border border-amber-100 text-amber-600" title={`Request for ₹${tour.advanceAmount} Pending`}>
+                                 <Clock className="w-5 h-5" />
+                             </div>
+                        ) : tour.advanceStatus === 'Approved' ? (
+                             <div className="p-3 rounded-xl bg-green-50 border border-green-100 text-green-600" title={`Advance of ₹${tour.advanceAmount} Approved`}>
+                                 <CheckCircle2 className="w-5 h-5" />
+                             </div>
+                        ) : null
                     )}
                 </div>
             </div>
@@ -220,6 +300,16 @@ export const ToursPage: React.FC = () => {
             tour={selectedTour}
             onClose={() => { setClaimModalOpen(false); setSelectedTour(null); }}
             onSuccess={handleClaimSuccess}
+          />
+      )}
+
+      {/* Advance Request Modal */}
+      {selectedTour && (
+          <AdvanceRequestModal 
+            isOpen={advanceModalOpen}
+            tour={selectedTour}
+            onClose={() => { setAdvanceModalOpen(false); setSelectedTour(null); }}
+            onSuccess={handleAdvanceSuccess}
           />
       )}
     </div>
