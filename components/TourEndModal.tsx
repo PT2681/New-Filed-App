@@ -1,11 +1,12 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { X, Camera, MapPin, Loader2, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { X, MapPin, Loader2, AlertTriangle, Building2, Undo2, Flag } from 'lucide-react';
 import { Button } from './FormElements';
-import { Tour } from '../types';
+import { Tour, TourPhase } from '../types';
 
 interface TourEndModalProps {
   isOpen: boolean;
   tour: Tour;
+  phase: TourPhase; // Current phase BEFORE action
   onClose: () => void;
   onSuccess: (data: { selfieUrl: string, location: any }) => void;
 }
@@ -26,7 +27,7 @@ const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: numbe
 };
 
 export const TourEndModal: React.FC<TourEndModalProps> = ({ 
-  isOpen, tour, onClose, onSuccess 
+  isOpen, tour, phase, onClose, onSuccess 
 }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -34,6 +35,7 @@ export const TourEndModal: React.FC<TourEndModalProps> = ({
   const [step, setStep] = useState<'LOCATION' | 'SELFIE' | 'ERROR'>('LOCATION');
   const [distance, setDistance] = useState(0);
   const [coords, setCoords] = useState<any>(null);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [selfie, setSelfie] = useState<string | null>(null);
 
   useEffect(() => {
@@ -42,6 +44,18 @@ export const TourEndModal: React.FC<TourEndModalProps> = ({
       checkLocation();
     }
   }, [isOpen]);
+
+  const getActionTitle = () => {
+    if (phase === 'OUTWARD') return "Verify Arrival";
+    if (phase === 'ON_SITE') return "Start Return Journey";
+    return "End Trip";
+  };
+
+  const getActionIcon = () => {
+    if (phase === 'OUTWARD') return <Building2 className="w-10 h-10 animate-bounce text-primary mx-auto" />;
+    if (phase === 'ON_SITE') return <Undo2 className="w-10 h-10 animate-bounce text-primary mx-auto" />;
+    return <Flag className="w-10 h-10 animate-bounce text-primary mx-auto" />;
+  };
 
   const checkLocation = async () => {
     try {
@@ -53,24 +67,36 @@ export const TourEndModal: React.FC<TourEndModalProps> = ({
       const current = { lat: position.coords.latitude, lng: position.coords.longitude };
       setCoords(current);
 
-      // Verify Radius (Mock logic if tour has 0,0 coords)
+      // Verify Location based on phase
+      // OUTWARD -> Check against toLocation
+      // ON_SITE -> Check against toLocation (starting return from site)
+      // RETURN -> Check against fromLocation (back at base) - For now we assume base is where they started, roughly.
+      
+      // Mock validation logic for demo
       if (tour.toCoordinates.lat === 0) {
         setStep('SELFIE');
         startCamera();
         return;
       }
 
-      const dist = calculateDistance(current.lat, current.lng, tour.toCoordinates.lat, tour.toCoordinates.lng);
+      // If we are ending trip, we technically check if they are back at origin, 
+      // but 'fromLocation' in mock data is string only. 
+      // For demo, we skip distance check for 'RETURN' phase or assume success.
+      
+      const targetLat = phase === 'RETURN' ? current.lat : tour.toCoordinates.lat;
+      const targetLng = phase === 'RETURN' ? current.lng : tour.toCoordinates.lng;
+
+      const dist = calculateDistance(current.lat, current.lng, targetLat, targetLng);
       setDistance(Math.round(dist));
 
-      if (dist <= 20000000) { // Using large radius for Demo since user location is random
+      // 20km radius for demo purposes
+      if (dist <= 20000) { 
          setTimeout(() => {
              setStep('SELFIE');
              startCamera();
          }, 1000);
       } else {
-         // Fail silently for demo or show warning? 
-         // For demo, let's proceed but warn.
+         // Proceed with warning for demo
          setTimeout(() => {
              setStep('SELFIE');
              startCamera();
@@ -117,26 +143,28 @@ export const TourEndModal: React.FC<TourEndModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/90 p-4">
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/90 p-4 animate-in fade-in duration-200">
        <div className="w-full max-w-sm bg-white rounded-3xl overflow-hidden p-6 relative min-h-[400px] flex flex-col items-center justify-center text-center">
           <button onClick={onClose} className="absolute top-4 right-4 p-2"><X className="w-5 h-5" /></button>
           
           {step === 'LOCATION' && (
              <div className="space-y-4">
                 <Loader2 className="w-10 h-10 animate-spin text-primary mx-auto" />
-                <h3 className="font-bold text-lg">Verifying Location</h3>
-                <p className="text-sm text-slate-500">Please wait while we check if you have reached {tour.toLocation}...</p>
+                <h3 className="font-bold text-lg">{getActionTitle()}</h3>
+                <p className="text-sm text-slate-500">Verifying GPS Location...</p>
              </div>
           )}
 
           {step === 'SELFIE' && (
               <div className="w-full h-full space-y-4">
-                 <h3 className="font-bold text-lg">Take Site Selfie</h3>
-                 <div className="relative rounded-xl overflow-hidden bg-black aspect-[3/4]">
+                 {getActionIcon()}
+                 <h3 className="font-bold text-lg">{getActionTitle()}</h3>
+                 <p className="text-xs text-slate-500 -mt-2 mb-2">Take a photo to confirm timestamp</p>
+                 <div className="relative rounded-xl overflow-hidden bg-black aspect-[3/4] shadow-lg">
                     <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover" />
                     <canvas ref={canvasRef} className="hidden" />
                  </div>
-                 <Button onClick={capturePhoto}>Capture & End Trip</Button>
+                 <Button onClick={capturePhoto}>Capture & Proceed</Button>
               </div>
           )}
 

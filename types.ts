@@ -82,6 +82,7 @@ export type ClaimStatus = 'Paid' | 'Due';
 export type TransportMode = 'Bike' | 'Car' | 'Bus';
 export type TravelType = 'Individual' | 'Pool';
 export type PoolRole = 'Driver' | 'Passenger';
+export type TourPhase = 'OUTWARD' | 'ON_SITE' | 'RETURN';
 
 export interface Tour {
   id: string;
@@ -98,15 +99,23 @@ export interface Tour {
   advanceAmount?: number;
   
   // Execution Details
-  actualStartDate?: string;
-  actualEndDate?: string;
+  tourPhase?: TourPhase; // New field
+  actualStartDate?: string; // Start of Outward
+  siteArrivalTime?: string; // Start of On-Site
+  returnStartTime?: string; // Start of Return
+  actualEndDate?: string; // End of Return (Complete)
+  
   transportMode?: TransportMode;
   travelType?: TravelType;
   poolRole?: PoolRole;
   vehiclePlateUrl?: string;
+  
   startSelfieUrl?: string;
-  surroundingVideoUrl?: string; // If Car/Bus in fine weather
+  siteArrivalSelfieUrl?: string; // New field
+  returnStartSelfieUrl?: string; // New field
   endSelfieUrl?: string;
+  
+  surroundingVideoUrl?: string; 
   distanceCovered?: number; // km
   weatherData?: string;
   
