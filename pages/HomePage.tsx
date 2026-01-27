@@ -241,7 +241,20 @@ export const HomePage: React.FC = () => {
         )}
       </div>
 
-      {/* Up Next Section */}
+      {/* Features Grid - MOVED UP */}
+      <section>
+        <div className="grid grid-cols-2 gap-3">
+          {FEATURES.map((feature) => (
+            <FeatureCard
+              key={feature.id}
+              feature={feature}
+              onClick={() => handleFeatureClick(feature)}
+            />
+          ))}
+        </div>
+      </section>
+
+      {/* Up Next Section - MOVED DOWN */}
       {(nextTraining || nextTour) && (
         <section className="space-y-3">
           <div className="flex justify-between items-end">
@@ -325,20 +338,6 @@ export const HomePage: React.FC = () => {
           </div>
         </section>
       )}
-
-      {/* Features Grid */}
-      <section>
-        {/* Title removed per request */}
-        <div className="grid grid-cols-2 gap-3">
-          {FEATURES.map((feature) => (
-            <FeatureCard
-              key={feature.id}
-              feature={feature}
-              onClick={() => handleFeatureClick(feature)}
-            />
-          ))}
-        </div>
-      </section>
 
       {/* Attendance Modal */}
       <AttendanceModal 
