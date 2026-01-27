@@ -11,6 +11,7 @@ import { TrainingPage } from './pages/TrainingPage';
 import { TrainingDetailsPage } from './pages/TrainingDetailsPage';
 import { ToursPage } from './pages/ToursPage';
 import { ActiveTourPage } from './pages/ActiveTourPage';
+import { HRPage } from './pages/HRPage';
 import { NotificationsPage } from './pages/NotificationsPage';
 import { PlaceholderPage } from './pages/PlaceholderPage';
 import { RoutePath } from './types';
@@ -46,6 +47,7 @@ const AppRoutes: React.FC = () => {
       <Route path={RoutePath.TRAINING_DETAILS} element={<TrainingDetailsPage />} />
       <Route path={RoutePath.TOURS} element={<ToursPage />} />
       <Route path={RoutePath.ACTIVE_TOUR} element={<ActiveTourPage />} />
+      <Route path={RoutePath.HR} element={<HRPage />} />
       <Route path={RoutePath.NOTIFICATIONS} element={<NotificationsPage />} />
       <Route path={RoutePath.SETTINGS} element={<PlaceholderPage title="Settings" />} />
       <Route path="*" element={<PlaceholderPage title="Page Not Found" />} />

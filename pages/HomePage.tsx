@@ -135,6 +135,8 @@ export const HomePage: React.FC = () => {
       navigate(RoutePath.TRAINING);
     } else if (feature.id === 'tours') {
       navigate(RoutePath.TOURS);
+    } else if (feature.id === 'hr') {
+      navigate(RoutePath.HR);
     } else {
       alert(`Coming Soon: ${feature.title}\n\nThis feature is part of the planned roadmap.`);
     }

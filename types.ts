@@ -16,6 +16,7 @@ export enum RoutePath {
   TRAINING_DETAILS = '/training/:id',
   TOURS = '/tours',
   ACTIVE_TOUR = '/tours/:id/active',
+  HR = '/hr',
   NOTIFICATIONS = '/notifications',
   SETTINGS = '/settings',
   LOGIN = '/login',
@@ -125,7 +126,7 @@ export interface Tour {
   claimAmount?: number;
 }
 
-export type NotificationType = 'PROJECT_ASSIGNED' | 'TRAINING_ASSIGNED' | 'CLAIM_PAID' | 'GENERAL';
+export type NotificationType = 'PROJECT_ASSIGNED' | 'TRAINING_ASSIGNED' | 'CLAIM_PAID' | 'LEAVE_UPDATE' | 'GENERAL';
 
 export interface Notification {
   id: string;
@@ -136,4 +137,18 @@ export interface Notification {
   read: boolean;
   referenceId?: string;
   route?: string;
+}
+
+export type LeaveType = 'Casual' | 'Sick' | 'Earned' | 'Emergency';
+export type LeaveStatus = 'Pending' | 'Approved' | 'Rejected';
+
+export interface LeaveRequest {
+  id: string;
+  type: LeaveType;
+  startDate: string;
+  endDate: string;
+  reason: string;
+  status: LeaveStatus;
+  appliedOn: string;
+  rejectionReason?: string;
 }

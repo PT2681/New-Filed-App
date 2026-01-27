@@ -43,6 +43,7 @@ export const Navbar: React.FC = () => {
     if (id === 'projects') navigate(RoutePath.PROJECTS);
     if (id === 'training') navigate(RoutePath.TRAINING);
     if (id === 'tours') navigate(RoutePath.TOURS);
+    if (id === 'hr') navigate(RoutePath.HR);
     setIsMenuOpen(false);
   };
 

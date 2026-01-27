@@ -1,4 +1,4 @@
-import { Feature, Project, TrainingSession, Tour, Notification } from './types';
+import { Feature, Project, TrainingSession, Tour, Notification, LeaveRequest } from './types';
 
 export const APP_NAME = 'Nexby Field-Force Pro';
 
@@ -23,6 +23,13 @@ export const FEATURES: Feature[] = [
     description: 'Manage travel, track visits, and claim expenses.',
     iconName: 'Map',
     color: 'bg-orange-100 text-orange-600',
+  },
+  {
+    id: 'hr',
+    title: 'HR Section',
+    description: 'Apply for leaves, check balance, and view holiday calendar.',
+    iconName: 'HeartHandshake',
+    color: 'bg-rose-100 text-rose-600',
   },
 ];
 
@@ -297,5 +304,36 @@ export const MOCK_NOTIFICATIONS: Notification[] = [
     message: 'The system will be undergoing maintenance on Sunday from 2 AM to 4 AM.',
     timestamp: new Date(Date.now() - 1000 * 60 * 60 * 48).toISOString(), // 2 days ago
     read: true,
+  }
+];
+
+export const MOCK_LEAVES: LeaveRequest[] = [
+  {
+    id: 'L-1',
+    type: 'Sick',
+    startDate: pastDate(20),
+    endDate: pastDate(19),
+    reason: 'Viral Fever',
+    status: 'Approved',
+    appliedOn: pastDate(22)
+  },
+  {
+    id: 'L-2',
+    type: 'Casual',
+    startDate: pastDate(5),
+    endDate: pastDate(4),
+    reason: 'Family Function',
+    status: 'Rejected',
+    appliedOn: pastDate(7),
+    rejectionReason: 'Urgent project deployment scheduled'
+  },
+  {
+    id: 'L-3',
+    type: 'Earned',
+    startDate: futureDate(10),
+    endDate: futureDate(15),
+    reason: 'Planned Vacation',
+    status: 'Pending',
+    appliedOn: pastDate(1)
   }
 ];
