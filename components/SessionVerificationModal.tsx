@@ -62,8 +62,9 @@ export const SessionVerificationModal: React.FC<SessionVerificationModalProps> =
     setStep('CAMERA');
     setErrorMsg("");
     try {
+      // Relaxed constraints for mobile support
       const mediaStream = await navigator.mediaDevices.getUserMedia({ 
-        video: { facingMode: 'environment', width: { ideal: 640 }, height: { ideal: 640 } },
+        video: { facingMode: 'environment' },
         audio: false 
       });
       setStream(mediaStream);
@@ -73,7 +74,7 @@ export const SessionVerificationModal: React.FC<SessionVerificationModalProps> =
     } catch (err) {
       console.error(err);
       setStep('ERROR');
-      setErrorMsg("Camera access denied.");
+      setErrorMsg("Camera access denied or unavailable.");
     }
   };
 
@@ -108,8 +109,6 @@ export const SessionVerificationModal: React.FC<SessionVerificationModalProps> =
       };
       setUserCoords(coords);
 
-      // In real app, verify against session.locationCoords
-      // For this demo, let's assume session coords are target.
       // If session coords are (0,0) [Online], skip check
       if (session.locationCoords.lat === 0 && session.locationCoords.lng === 0) {
         finalizeSuccess(data => onSuccess(data), photoData!, coords);

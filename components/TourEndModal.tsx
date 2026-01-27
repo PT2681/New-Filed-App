@@ -106,7 +106,9 @@ export const TourEndModal: React.FC<TourEndModalProps> = ({
 
   const startCamera = async () => {
     try {
-      const mediaStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } });
+      const mediaStream = await navigator.mediaDevices.getUserMedia({ 
+          video: { facingMode: 'user' } 
+      });
       if (videoRef.current) {
         videoRef.current.srcObject = mediaStream;
       }

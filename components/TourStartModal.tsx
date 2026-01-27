@@ -62,6 +62,7 @@ export const TourStartModal: React.FC<TourStartModalProps> = ({
 
   const startCamera = async () => {
     try {
+      // Relaxed constraints for mobile compatibility
       const mediaStream = await navigator.mediaDevices.getUserMedia({ 
         video: { facingMode: step === 'SELFIE' ? 'user' : 'environment' },
         audio: false 
@@ -72,7 +73,7 @@ export const TourStartModal: React.FC<TourStartModalProps> = ({
       }
     } catch (err) {
       console.error(err);
-      alert("Camera access failed");
+      alert("Camera access failed. Please ensure permissions are granted.");
     }
   };
 
@@ -105,8 +106,6 @@ export const TourStartModal: React.FC<TourStartModalProps> = ({
       setStep('VIDEO');
     } else {
       // Logic: If bad weather OR Bike -> Plate
-      // Spec says "Without any 360 view video upload"
-      // Then "Scan number plate"
       setStep('PLATE');
       startCamera(); // Pre-start for plate
     }
@@ -194,9 +193,6 @@ export const TourStartModal: React.FC<TourStartModalProps> = ({
                   <button
                     key={mode}
                     onClick={() => handleModeSelect(mode)}
-                    disabled={!isBadWeather && mode === 'Bike' ? false : !isBadWeather && (mode === 'Car' || mode === 'Bus') ? false : false} 
-                    // Spec: "If weather is fine then Bike shall be allowed" - doesn't explicitly ban others but says "If car/bus... 360 view".
-                    // Implies all allowed, just different flows.
                     className={`p-4 rounded-xl border-2 flex flex-col items-center gap-2 transition-all ${
                       transportMode === mode 
                         ? 'border-primary bg-indigo-50 text-primary' 

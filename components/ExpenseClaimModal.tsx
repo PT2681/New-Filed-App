@@ -81,7 +81,9 @@ export const ExpenseClaimModal: React.FC<ExpenseClaimModalProps> = ({
   const startCamera = async () => {
     setIsCameraOpen(true);
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        video: { facingMode: 'environment' } 
+      });
       if (videoRef.current) videoRef.current.srcObject = stream;
     } catch (e) { console.error(e); }
   };

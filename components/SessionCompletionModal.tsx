@@ -39,18 +39,15 @@ export const SessionCompletionModal: React.FC<SessionCompletionModalProps> = ({
       stream.getTracks().forEach(track => track.stop());
       setStream(null);
     }
-    if (step === 'CAMERA') {
-        // Only reset step if we were in camera mode, 
-        // if we are in FORM mode we might want to preserve state if just unmounting
-    }
   };
 
   const startCamera = async () => {
     setStep('CAMERA');
     setErrorMsg("");
     try {
+      // Relaxed constraints for mobile compatibility
       const mediaStream = await navigator.mediaDevices.getUserMedia({ 
-        video: { facingMode: 'environment', width: { ideal: 640 }, height: { ideal: 640 } },
+        video: { facingMode: 'environment' },
         audio: false 
       });
       setStream(mediaStream);
@@ -60,7 +57,7 @@ export const SessionCompletionModal: React.FC<SessionCompletionModalProps> = ({
     } catch (err) {
       console.error(err);
       setStep('ERROR');
-      setErrorMsg("Camera access denied.");
+      setErrorMsg("Camera access denied or unavailable.");
     }
   };
 

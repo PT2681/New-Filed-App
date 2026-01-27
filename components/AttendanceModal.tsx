@@ -49,9 +49,9 @@ export const AttendanceModal: React.FC<AttendanceModalProps> = ({ isOpen, mode, 
     setErrorMsg("");
     
     try {
-      // 1. Get Camera
+      // 1. Get Camera - REMOVED resolution constraints which fail on mobile
       const mediaStream = await navigator.mediaDevices.getUserMedia({ 
-        video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 640 } },
+        video: { facingMode: 'user' },
         audio: false 
       });
       setStream(mediaStream);
@@ -67,10 +67,19 @@ export const AttendanceModal: React.FC<AttendanceModalProps> = ({ isOpen, mode, 
         simulateLivenessCheck();
       }, 1500);
 
-    } catch (err) {
-      console.error(err);
+    } catch (err: any) {
+      console.error("Camera Error:", err);
       setStep('ERROR');
-      setErrorMsg("Camera access denied. Please enable permissions to continue.");
+      // Provide more specific feedback
+      if (err.name === 'NotAllowedError') {
+        setErrorMsg("Permission denied. Please allow camera access in your browser settings.");
+      } else if (err.name === 'NotFoundError') {
+        setErrorMsg("No camera device found.");
+      } else if (err.name === 'NotReadableError') {
+        setErrorMsg("Camera is currently in use by another app.");
+      } else {
+        setErrorMsg(`Camera error: ${err.message || 'Unknown error'}`);
+      }
     }
   };
 
@@ -164,7 +173,7 @@ export const AttendanceModal: React.FC<AttendanceModalProps> = ({ isOpen, mode, 
               <div className="w-16 h-16 rounded-full bg-red-500/10 flex items-center justify-center mx-auto">
                 <X className="w-8 h-8 text-red-500" />
               </div>
-              <p className="text-white font-medium">{errorMsg}</p>
+              <p className="text-white font-medium text-sm px-4">{errorMsg}</p>
               <Button variant="outline" onClick={startProcess} className="bg-slate-800 text-white border-slate-700 hover:bg-slate-700">
                 <RefreshCw className="w-4 h-4" /> Try Again
               </Button>
@@ -178,7 +187,7 @@ export const AttendanceModal: React.FC<AttendanceModalProps> = ({ isOpen, mode, 
               <p className="text-slate-400 text-sm">Attendance logged successfully.</p>
             </div>
           ) : (
-            <div className="relative w-full h-full flex flex-col items-center">
+            <div className="relative w-full h-full flex flex-col items-center overflow-hidden">
               {/* Camera Feed */}
               <video 
                 ref={videoRef} 
