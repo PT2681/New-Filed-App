@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   MapPin, Cloud, Clock, CheckCircle2, AlertCircle, 
-  Calendar, GraduationCap, Map
+  Calendar, GraduationCap, Map, CloudSun, CloudRain, ThermometerSun
 } from 'lucide-react';
 import { FeatureCard } from '../components/FeatureCard';
 import { Button } from '../components/FormElements';
@@ -23,6 +23,9 @@ export const HomePage: React.FC = () => {
   
   const [showPunchModal, setShowPunchModal] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
+  
+  // Weather State
+  const [currentWeather, setCurrentWeather] = useState({ temp: 28, condition: 'Sunny' });
 
   // Dashboard Data State
   const [nextTraining, setNextTraining] = useState<TrainingSession | null>(null);
@@ -35,6 +38,16 @@ export const HomePage: React.FC = () => {
     if (saved) {
       setAttendance(JSON.parse(saved));
     }
+
+    // Mock Weather Fetch
+    const conditions = [
+      { temp: 29, condition: 'Sunny' },
+      { temp: 24, condition: 'Cloudy' },
+      { temp: 22, condition: 'Rainy' },
+      { temp: 27, condition: 'Clear' }
+    ];
+    // Pick random for demo purposes
+    setCurrentWeather(conditions[Math.floor(Math.random() * conditions.length)]);
 
     // Load Next Tasks
     const loadNextTasks = () => {
@@ -150,6 +163,12 @@ export const HomePage: React.FC = () => {
            d.getFullYear() === today.getFullYear();
   };
 
+  const getWeatherIcon = () => {
+    if (currentWeather.condition === 'Rainy') return <CloudRain className="w-3.5 h-3.5 text-blue-500" />;
+    if (currentWeather.condition === 'Cloudy') return <Cloud className="w-3.5 h-3.5 text-slate-500" />;
+    return <CloudSun className="w-3.5 h-3.5 text-orange-500" />;
+  };
+
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
       
@@ -161,9 +180,17 @@ export const HomePage: React.FC = () => {
             {currentTime.toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'long' })}
           </p>
         </div>
-        <div className="bg-white px-3 py-1 rounded-full shadow-sm border border-slate-100 text-xs font-semibold text-slate-600 flex items-center gap-2">
-          <Clock className="w-3 h-3 text-primary" />
-          {currentTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+        
+        <div className="flex flex-col items-end gap-1.5">
+            <div className="bg-white px-3 py-1.5 rounded-full shadow-sm border border-slate-100 text-xs font-semibold text-slate-600 flex items-center gap-2">
+              <Clock className="w-3.5 h-3.5 text-primary" />
+              {currentTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+            </div>
+            
+            <div className="bg-white px-3 py-1.5 rounded-full shadow-sm border border-slate-100 text-xs font-semibold text-slate-600 flex items-center gap-2">
+               {getWeatherIcon()}
+               <span>{currentWeather.condition}, {currentWeather.temp}°C</span>
+            </div>
         </div>
       </div>
 

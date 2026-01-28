@@ -1,5 +1,5 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
-import { X, Camera, Car, Bike, Bus, MapPin, User, Users, Video, Cloud, Sun, ToggleLeft, ToggleRight, ArrowRight, CheckCircle2, Scan, Loader2, ScanFace } from 'lucide-react';
+import { X, Camera, Car, Bike, Bus, MapPin, User, Users, Video, Cloud, Sun, ToggleLeft, ToggleRight, ArrowRight, CheckCircle2, Scan, Loader2, ScanFace, CloudRain, RefreshCw } from 'lucide-react';
 import { Button, Input } from './FormElements';
 import { Tour, TransportMode, TravelType, PoolRole } from '../types';
 import { MOCK_PROJECTS } from '../constants';
@@ -31,6 +31,7 @@ export const TourStartModal: React.FC<TourStartModalProps> = ({
   // Flow State
   const [step, setStep] = useState<Step>('MODE');
   const [isBadWeather, setIsBadWeather] = useState(false);
+  const [isWeatherLoading, setIsWeatherLoading] = useState(false);
   
   // Data State
   const [transportMode, setTransportMode] = useState<TransportMode | null>(null);
@@ -55,16 +56,27 @@ export const TourStartModal: React.FC<TourStartModalProps> = ({
   useEffect(() => {
     if (isOpen) {
       setStep('MODE');
-      setIsBadWeather(false);
       setTransportMode(null);
       setVideoFile(null);
       setPlatePhoto(null);
       setSelfiePhoto(null);
+      detectWeather();
     } else {
       stopCamera();
     }
     return () => stopCamera();
   }, [isOpen]);
+
+  const detectWeather = () => {
+    setIsWeatherLoading(true);
+    // Simulate API call to weather service
+    setTimeout(() => {
+        // Mock logic: 20% chance of rain for demo
+        const badWeather = Math.random() > 0.8;
+        setIsBadWeather(badWeather);
+        setIsWeatherLoading(false);
+    }, 800);
+  };
 
   const stopCamera = () => {
     if (timeoutRef.current) clearTimeout(timeoutRef.current);
@@ -243,39 +255,66 @@ export const TourStartModal: React.FC<TourStartModalProps> = ({
               {/* Step 1: Transport Mode & Weather */}
               {step === 'MODE' && (
                 <div className="space-y-6">
-                  <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      {isBadWeather ? <Cloud className="text-slate-500 w-6 h-6" /> : <Sun className="text-orange-500 w-6 h-6" />}
-                      <div>
-                        <p className="font-semibold text-sm">Current Weather</p>
-                        <p className="text-xs text-slate-500">{isBadWeather ? "Rainy/Bad" : "Sunny/Fine"}</p>
-                      </div>
-                    </div>
-                    <button onClick={() => setIsBadWeather(!isBadWeather)} className="text-primary">
-                      {isBadWeather ? <ToggleLeft className="w-8 h-8" /> : <ToggleRight className="w-8 h-8" />}
-                    </button>
+                  {/* Weather Status Card - Now Auto-Detected */}
+                  <div className={`p-4 rounded-xl border flex items-center justify-between transition-colors duration-500 ${isBadWeather ? 'bg-blue-50 border-blue-100' : 'bg-orange-50 border-orange-100'}`}>
+                    {isWeatherLoading ? (
+                        <div className="flex items-center gap-3 w-full">
+                           <Loader2 className="w-6 h-6 text-slate-400 animate-spin" />
+                           <div>
+                              <p className="font-semibold text-sm text-slate-600">Checking Weather...</p>
+                              <p className="text-xs text-slate-400">Syncing with local station</p>
+                           </div>
+                        </div>
+                    ) : (
+                        <>
+                            <div className="flex items-center gap-3">
+                              <div className={`p-2 rounded-full ${isBadWeather ? 'bg-blue-100' : 'bg-orange-100'}`}>
+                                {isBadWeather ? <CloudRain className="text-blue-500 w-6 h-6" /> : <Sun className="text-orange-500 w-6 h-6" />}
+                              </div>
+                              <div>
+                                <p className="font-semibold text-sm text-slate-900">Current Weather</p>
+                                <p className="text-xs text-slate-500 flex items-center gap-1.5">
+                                   {isBadWeather ? "Rainy/Bad Conditions" : "Sunny/Good Conditions"}
+                                   <span className="bg-white/50 px-1.5 py-0.5 rounded text-[10px] font-bold border border-black/5 uppercase tracking-wide">
+                                     Auto-Detected
+                                   </span>
+                                </p>
+                              </div>
+                            </div>
+                            <button 
+                                onClick={detectWeather} 
+                                className="p-2 rounded-full hover:bg-black/5 text-slate-400 active:rotate-180 transition-all"
+                                title="Refresh Weather"
+                            >
+                                <RefreshCw className="w-4 h-4" />
+                            </button>
+                        </>
+                    )}
                   </div>
 
-                  <div className="grid grid-cols-3 gap-3">
-                    {(['Bike', 'Car', 'Bus'] as const).map(mode => (
-                      <button
-                        key={mode}
-                        onClick={() => handleModeSelect(mode)}
-                        className={`p-4 rounded-xl border-2 flex flex-col items-center gap-2 transition-all ${
-                          transportMode === mode 
-                            ? 'border-primary bg-indigo-50 text-primary' 
-                            : 'border-slate-100 bg-white text-slate-500 hover:border-slate-200'
-                        }`}
-                      >
-                        {mode === 'Bike' && <Bike className="w-6 h-6" />}
-                        {mode === 'Car' && <Car className="w-6 h-6" />}
-                        {mode === 'Bus' && <Bus className="w-6 h-6" />}
-                        <span className="text-xs font-bold">{mode}</span>
-                      </button>
-                    ))}
+                  <div>
+                     <h4 className="font-bold text-lg text-slate-900 mb-4">Select Transport Mode</h4>
+                     <div className="grid grid-cols-3 gap-3">
+                        {(['Bike', 'Car', 'Bus'] as const).map(mode => (
+                        <button
+                            key={mode}
+                            onClick={() => handleModeSelect(mode)}
+                            className={`p-4 rounded-xl border-2 flex flex-col items-center gap-2 transition-all ${
+                            transportMode === mode 
+                                ? 'border-primary bg-indigo-50 text-primary' 
+                                : 'border-slate-100 bg-white text-slate-500 hover:border-slate-200'
+                            }`}
+                        >
+                            {mode === 'Bike' && <Bike className="w-6 h-6" />}
+                            {mode === 'Car' && <Car className="w-6 h-6" />}
+                            {mode === 'Bus' && <Bus className="w-6 h-6" />}
+                            <span className="text-xs font-bold">{mode}</span>
+                        </button>
+                        ))}
+                     </div>
                   </div>
 
-                  <Button disabled={!transportMode} onClick={handleNextFromMode}>
+                  <Button disabled={!transportMode || isWeatherLoading} onClick={handleNextFromMode}>
                     Continue <ArrowRight className="w-4 h-4" />
                   </Button>
                 </div>
