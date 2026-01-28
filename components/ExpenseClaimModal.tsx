@@ -1,5 +1,5 @@
-import React, { useState, useRef } from 'react';
-import { X, Calculator, Plus, Trash2, Receipt, Camera, CheckCircle2, ChevronRight, ArrowLeft } from 'lucide-react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
+import { X, Calculator, Plus, Trash2, Receipt, Camera, CheckCircle2, ChevronRight, ArrowLeft, Loader2 } from 'lucide-react';
 import { Button, Input } from './FormElements';
 import { Tour } from '../types';
 
@@ -40,9 +40,11 @@ export const ExpenseClaimModal: React.FC<ExpenseClaimModalProps> = ({
   const [isAddingExpense, setIsAddingExpense] = useState(false);
 
   // Camera Refs
-  const videoRef = useRef<HTMLVideoElement>(null);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isCameraOpen, setIsCameraOpen] = useState(false);
+  const [stream, setStream] = useState<MediaStream | null>(null);
+  const [isVideoReady, setIsVideoReady] = useState(false);
 
   // Calculation Logic
   const distance = tour.distanceCovered || 0;
@@ -54,6 +56,10 @@ export const ExpenseClaimModal: React.FC<ExpenseClaimModalProps> = ({
   
   const totalReceipts = expenses.reduce((sum, item) => sum + item.amount, 0);
   const grandTotal = travelAmount + totalReceipts;
+
+  useEffect(() => {
+    return () => stopCamera();
+  }, []);
 
   const handleAddExpense = () => {
     if (!newExpAmount) return;
@@ -80,30 +86,53 @@ export const ExpenseClaimModal: React.FC<ExpenseClaimModalProps> = ({
   // Camera Logic for Receipts
   const startCamera = async () => {
     setIsCameraOpen(true);
+    setIsVideoReady(false);
+    if (stream) stream.getTracks().forEach(t => t.stop());
+
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ 
+      const mediaStream = await navigator.mediaDevices.getUserMedia({ 
         video: { facingMode: 'environment' } 
       });
-      if (videoRef.current) videoRef.current.srcObject = stream;
-    } catch (e) { console.error(e); }
+      setStream(mediaStream);
+    } catch (e) { 
+        console.error(e);
+        setIsCameraOpen(false); 
+    }
   };
+
+  const stopCamera = () => {
+      if (stream) {
+          stream.getTracks().forEach(t => t.stop());
+          setStream(null);
+      }
+      setIsVideoReady(false);
+      setIsCameraOpen(false);
+  };
+
+  const setVideoRef = useCallback((node: HTMLVideoElement | null) => {
+    videoRef.current = node;
+    if (node && stream) {
+      node.srcObject = stream;
+      node.setAttribute('playsinline', 'true');
+      node.play().catch(console.warn);
+    }
+  }, [stream]);
 
   const capturePhoto = () => {
     if (videoRef.current && canvasRef.current) {
       const video = videoRef.current;
       const canvas = canvasRef.current;
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-      const ctx = canvas.getContext('2d');
-      if (ctx) {
-        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-        const data = canvas.toDataURL('image/jpeg');
-        setNewExpPhoto(data);
-        
-        // Stop Stream
-        const stream = video.srcObject as MediaStream;
-        stream.getTracks().forEach(t => t.stop());
-        setIsCameraOpen(false);
+      
+      if (video.videoWidth > 0 && video.videoHeight > 0) {
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            const data = canvas.toDataURL('image/jpeg');
+            setNewExpPhoto(data);
+            stopCamera();
+        }
       }
     }
   };
@@ -298,12 +327,27 @@ export const ExpenseClaimModal: React.FC<ExpenseClaimModalProps> = ({
               {/* Camera View */}
               {isCameraOpen && (
                 <div className="absolute inset-0 bg-black z-50 flex flex-col">
-                   <video ref={videoRef} autoPlay playsInline className="flex-1 object-cover" />
+                   <video 
+                        ref={setVideoRef} 
+                        autoPlay 
+                        playsInline 
+                        muted
+                        onPlaying={() => setIsVideoReady(true)}
+                        className="flex-1 object-cover" 
+                    />
                    <canvas ref={canvasRef} className="hidden" />
-                   <div className="p-4 flex justify-between items-center bg-black/50 backdrop-blur-sm absolute bottom-0 w-full">
-                     <button onClick={() => setIsCameraOpen(false)} className="text-white p-2">Cancel</button>
+                   
+                   {!isVideoReady && (
+                        <div className="absolute inset-0 flex items-center justify-center bg-black/50 z-10">
+                            <Loader2 className="w-8 h-8 text-white animate-spin" />
+                        </div>
+                   )}
+
+                   <div className="p-4 flex justify-between items-center bg-black/50 backdrop-blur-sm absolute bottom-0 w-full z-20">
+                     <button onClick={stopCamera} className="text-white p-2">Cancel</button>
                      <button 
                         onClick={capturePhoto} 
+                        disabled={!isVideoReady}
                         className="w-16 h-16 rounded-full border-4 border-white bg-white/20 flex items-center justify-center"
                      >
                        <div className="w-12 h-12 bg-white rounded-full"></div>

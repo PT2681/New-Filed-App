@@ -49,7 +49,7 @@ export const TrainingPage: React.FC = () => {
     setShowVerificationModal(true);
   };
 
-  const handleSessionStarted = (data: { photoUrl: string, location: any }) => {
+  const handleSessionStarted = (data: { selfieUrl: string, venuePhotoUrl: string, location: any }) => {
     if (!selectedSession) return;
     
     const updatedSessions = sessions.map(s => {
@@ -57,7 +57,7 @@ export const TrainingPage: React.FC = () => {
         return {
           ...s,
           status: 'In Progress' as const,
-          photoUrl: data.photoUrl,
+          photoUrl: data.venuePhotoUrl, // Storing Venue Photo as primary
           actualStartTime: new Date().toISOString()
         };
       }
@@ -74,7 +74,7 @@ export const TrainingPage: React.FC = () => {
     setShowCompletionModal(true);
   };
 
-  const handleSessionCompleted = (data: { photoUrl: string, remarks: string }) => {
+  const handleSessionCompleted = (data: { selfieUrl: string, sessionPhotoUrl: string, remarks: string }) => {
     if (!selectedSession) return;
 
     const updatedSessions = sessions.map(s => {
@@ -83,7 +83,7 @@ export const TrainingPage: React.FC = () => {
           ...s,
           status: 'Completed' as const,
           actualEndTime: new Date().toISOString(),
-          completionPhotoUrl: data.photoUrl,
+          completionPhotoUrl: data.sessionPhotoUrl, // Storing Session Photo as primary
           remarks: data.remarks
         };
       }

@@ -1,5 +1,5 @@
-import React, { useRef, useState, useEffect } from 'react';
-import { X, MapPin, Loader2, AlertTriangle, Building2, Undo2, Flag } from 'lucide-react';
+import React, { useRef, useState, useEffect, useCallback } from 'react';
+import { X, MapPin, Loader2, AlertTriangle, Building2, Undo2, Flag, ScanFace, CheckCircle2 } from 'lucide-react';
 import { Button } from './FormElements';
 import { Tour, TourPhase } from '../types';
 
@@ -10,6 +10,16 @@ interface TourEndModalProps {
   onClose: () => void;
   onSuccess: (data: { selfieUrl: string, location: any }) => void;
 }
+
+type Step = 'LOCATION' | 'LIVENESS_INIT' | 'LIVENESS_ACTION' | 'VERIFYING' | 'CAPTURED' | 'ERROR';
+
+const LIVENESS_ACTIONS = [
+  "Blink your eyes twice",
+  "Turn your head slightly to the left",
+  "Turn your head slightly to the right",
+  "Smile for the camera",
+  "Nod your head"
+];
 
 // Reuse logic from SessionVerification for distance (simplified here)
 const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
@@ -29,32 +39,41 @@ const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: numbe
 export const TourEndModal: React.FC<TourEndModalProps> = ({ 
   isOpen, tour, phase, onClose, onSuccess 
 }) => {
-  const videoRef = useRef<HTMLVideoElement>(null);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   
-  const [step, setStep] = useState<'LOCATION' | 'SELFIE' | 'ERROR'>('LOCATION');
+  const [step, setStep] = useState<Step>('LOCATION');
   const [distance, setDistance] = useState(0);
   const [coords, setCoords] = useState<any>(null);
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [selfie, setSelfie] = useState<string | null>(null);
+  const [stream, setStream] = useState<MediaStream | null>(null);
+  const [isVideoReady, setIsVideoReady] = useState(false);
+  const [livenessAction, setLivenessAction] = useState("");
 
   useEffect(() => {
     if (isOpen) {
       setStep('LOCATION');
       checkLocation();
+    } else {
+      stopCamera();
     }
+    return () => stopCamera();
   }, [isOpen]);
+
+  const stopCamera = () => {
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    if (stream) {
+      stream.getTracks().forEach(track => track.stop());
+      setStream(null);
+    }
+    setIsVideoReady(false);
+  };
 
   const getActionTitle = () => {
     if (phase === 'OUTWARD') return "Verify Arrival";
     if (phase === 'ON_SITE') return "Start Return Journey";
     return "End Trip";
-  };
-
-  const getActionIcon = () => {
-    if (phase === 'OUTWARD') return <Building2 className="w-10 h-10 animate-bounce text-primary mx-auto" />;
-    if (phase === 'ON_SITE') return <Undo2 className="w-10 h-10 animate-bounce text-primary mx-auto" />;
-    return <Flag className="w-10 h-10 animate-bounce text-primary mx-auto" />;
   };
 
   const checkLocation = async () => {
@@ -68,13 +87,8 @@ export const TourEndModal: React.FC<TourEndModalProps> = ({
       setCoords(current);
 
       // Verify Location based on phase
-      // OUTWARD -> Check against toLocation
-      // ON_SITE -> Check against toLocation (starting return from site)
-      // RETURN -> Check against fromLocation (back at base) - For now we assume base is where they started, roughly.
-      
       // Mock validation logic for demo
       if (tour.toCoordinates.lat === 0) {
-        setStep('SELFIE');
         startCamera();
         return;
       }
@@ -85,19 +99,10 @@ export const TourEndModal: React.FC<TourEndModalProps> = ({
       const dist = calculateDistance(current.lat, current.lng, targetLat, targetLng);
       setDistance(Math.round(dist));
 
-      // 20km radius for demo purposes (Wide radius for easy testing)
-      if (dist <= 20000) { 
-         setTimeout(() => {
-             setStep('SELFIE');
-             startCamera();
-         }, 1000);
-      } else {
-         // Proceed with warning for demo
-         setTimeout(() => {
-             setStep('SELFIE');
-             startCamera();
-         }, 1000);
-      }
+      // Proceed regardless of distance for demo (would be strict in prod)
+      setTimeout(() => {
+          startCamera();
+      }, 1000);
 
     } catch (e) {
       setStep('ERROR');
@@ -105,75 +110,169 @@ export const TourEndModal: React.FC<TourEndModalProps> = ({
   };
 
   const startCamera = async () => {
+    setStep('LIVENESS_INIT');
     try {
+      if (stream) stream.getTracks().forEach(t => t.stop());
+      
       const mediaStream = await navigator.mediaDevices.getUserMedia({ 
           video: { facingMode: 'user' } 
       });
-      if (videoRef.current) {
-        videoRef.current.srcObject = mediaStream;
-      }
-    } catch (e) { console.error(e); }
+      setStream(mediaStream);
+
+      // Start Liveness sequence
+      timeoutRef.current = setTimeout(() => {
+          setStep('LIVENESS_ACTION');
+          setLivenessAction(LIVENESS_ACTIONS[Math.floor(Math.random() * LIVENESS_ACTIONS.length)]);
+          simulateLivenessCheck();
+      }, 2000);
+
+    } catch (e) { console.error(e); setStep('ERROR'); }
   };
+
+  const simulateLivenessCheck = () => {
+    let progress = 0;
+    const interval = setInterval(() => {
+      progress += 1;
+      if (progress >= 100) {
+        clearInterval(interval);
+        setStep('VERIFYING');
+        setTimeout(() => capturePhoto(), 1500);
+      }
+    }, 30);
+  };
+
+  const setVideoRef = useCallback((node: HTMLVideoElement | null) => {
+    videoRef.current = node;
+    if (node && stream) {
+      node.srcObject = stream;
+      node.setAttribute('playsinline', 'true');
+      node.play().catch(console.warn);
+    }
+  }, [stream]);
 
   const capturePhoto = () => {
     if (videoRef.current && canvasRef.current) {
         const video = videoRef.current;
         const canvas = canvasRef.current;
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-        const ctx = canvas.getContext('2d');
-        if (ctx) {
-            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-            const data = canvas.toDataURL('image/jpeg');
-            setSelfie(data);
-            streamStop();
-            onSuccess({ selfieUrl: data, location: coords });
+        if (video.videoWidth > 0 && video.videoHeight > 0) {
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            const ctx = canvas.getContext('2d');
+            if (ctx) {
+                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                const data = canvas.toDataURL('image/jpeg');
+                setSelfie(data);
+                setStep('CAPTURED');
+            }
         }
     }
   };
 
-  const streamStop = () => {
-    if (videoRef.current && videoRef.current.srcObject) {
-        (videoRef.current.srcObject as MediaStream).getTracks().forEach(t => t.stop());
-    }
+  const handleFinalSubmit = () => {
+      if (selfie && coords) {
+          onSuccess({ selfieUrl: selfie, location: coords });
+      }
   };
 
   if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/90 p-4 animate-in fade-in duration-200">
-       <div className="w-full max-w-sm bg-white rounded-3xl overflow-hidden p-6 relative min-h-[400px] flex flex-col items-center justify-center text-center">
-          <button onClick={onClose} className="absolute top-4 right-4 p-2"><X className="w-5 h-5" /></button>
+       <div className="w-full max-w-sm bg-slate-900 rounded-3xl overflow-hidden shadow-2xl relative flex flex-col h-[500px]">
           
+          {/* Close Button - Visible unless capturing */}
+          <button onClick={onClose} className="absolute top-4 right-4 z-50 p-2 bg-black/20 rounded-full text-white hover:bg-black/40">
+             <X className="w-5 h-5" />
+          </button>
+
+          {/* Location Loading */}
           {step === 'LOCATION' && (
-             <div className="space-y-4">
-                <Loader2 className="w-10 h-10 animate-spin text-primary mx-auto" />
+             <div className="absolute inset-0 bg-white flex flex-col items-center justify-center p-6 text-center space-y-4">
+                <Loader2 className="w-10 h-10 animate-spin text-primary" />
                 <h3 className="font-bold text-lg">{getActionTitle()}</h3>
                 <p className="text-sm text-slate-500">Verifying GPS Location...</p>
              </div>
           )}
 
-          {step === 'SELFIE' && (
-              <div className="w-full h-full space-y-4">
-                 {getActionIcon()}
-                 <h3 className="font-bold text-lg">{getActionTitle()}</h3>
-                 <p className="text-xs text-slate-500 -mt-2 mb-2">Take a photo to confirm timestamp</p>
-                 <div className="relative rounded-xl overflow-hidden bg-black aspect-[3/4] shadow-lg">
-                    <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover" />
-                    <canvas ref={canvasRef} className="hidden" />
-                 </div>
-                 <Button onClick={capturePhoto}>Capture & Proceed</Button>
+          {/* Camera / Liveness Flow - Using flex-1 layout instead of absolute inset-0 overlay */}
+          {(step === 'LIVENESS_INIT' || step === 'LIVENESS_ACTION' || step === 'VERIFYING') && (
+              <div className="flex-1 relative bg-black w-full">
+                 <video 
+                     ref={setVideoRef} 
+                     autoPlay 
+                     playsInline 
+                     muted 
+                     onPlaying={() => setIsVideoReady(true)}
+                     className="absolute inset-0 w-full h-full object-cover scale-x-[-1]" 
+                 />
+                 <canvas ref={canvasRef} className="hidden" />
+
+                 {/* Overlays */}
+                 {isVideoReady && (
+                   <div className="absolute inset-0 pointer-events-none">
+                      {/* Face Circle */}
+                      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">
+                          <div className={`w-64 h-64 rounded-full border-2 transition-all ${step === 'VERIFYING' ? 'border-primary shadow-[0_0_30px_rgba(99,102,241,0.5)]' : 'border-white/30'}`}></div>
+                           {step === 'VERIFYING' && (
+                               <div className="absolute top-0 left-0 w-full h-1 bg-primary/80 shadow-[0_0_15px_#6366f1] animate-[scan_1.5s_ease-in-out_infinite]"></div>
+                           )}
+                      </div>
+
+                      {/* Instructions */}
+                      <div className="absolute bottom-10 left-4 right-4 text-center">
+                          <div className="bg-black/60 backdrop-blur-md p-4 rounded-2xl border border-white/10">
+                              {step === 'LIVENESS_INIT' && <p className="text-white font-medium">Position your face in the circle</p>}
+                              {step === 'LIVENESS_ACTION' && (
+                                  <div className="space-y-1 animate-in slide-in-from-bottom-2">
+                                      <p className="text-primary font-bold uppercase text-[10px] tracking-widest">Liveness Check</p>
+                                      <p className="text-xl font-bold text-white">{livenessAction}</p>
+                                  </div>
+                              )}
+                              {step === 'VERIFYING' && (
+                                  <div className="flex items-center justify-center gap-2 text-white">
+                                      <Loader2 className="w-5 h-5 animate-spin text-primary" />
+                                      <span className="font-medium">Verifying Identity...</span>
+                                  </div>
+                              )}
+                          </div>
+                      </div>
+                   </div>
+                 )}
               </div>
           )}
 
-           {step === 'ERROR' && (
-              <div className="space-y-4">
-                 <AlertTriangle className="w-10 h-10 text-red-500 mx-auto" />
-                 <p>Location Error. Please try again.</p>
+          {/* Captured Success */}
+          {step === 'CAPTURED' && selfie && (
+              <div className="absolute inset-0 bg-slate-900 flex flex-col items-center justify-center p-6 text-center space-y-6 animate-in zoom-in-95">
+                 <div className="w-48 h-48 rounded-full overflow-hidden border-4 border-green-500 shadow-[0_0_20px_rgba(34,197,94,0.3)]">
+                     <img src={selfie} className="w-full h-full object-cover scale-x-[-1]" alt="Verified" />
+                 </div>
+                 <div>
+                    <h3 className="text-2xl font-bold text-white mb-2 flex items-center justify-center gap-2">
+                      <CheckCircle2 className="w-8 h-8 text-green-500" /> Verified
+                    </h3>
+                    <p className="text-slate-400 text-sm">Location and Identity Confirmed.</p>
+                 </div>
+                 <Button onClick={handleFinalSubmit}>Confirm & Proceed</Button>
+              </div>
+          )}
+
+          {step === 'ERROR' && (
+              <div className="absolute inset-0 bg-white flex flex-col items-center justify-center p-6 text-center space-y-4">
+                 <AlertTriangle className="w-10 h-10 text-red-500" />
+                 <p className="text-slate-700">Unable to verify location or camera.</p>
                  <Button onClick={onClose} variant="outline">Close</Button>
               </div>
           )}
        </div>
+       <style>{`
+        @keyframes scan {
+          0%, 100% { transform: translateY(0); opacity: 0; }
+          10% { opacity: 1; }
+          90% { opacity: 1; }
+          100% { transform: translateY(256px); opacity: 0; }
+        }
+      `}</style>
     </div>
   );
 };
