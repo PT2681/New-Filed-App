@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { X, Camera, MapPin, Loader2, ScanFace, CheckCircle2, RefreshCw } from 'lucide-react';
 import { Button } from './FormElements';
 
@@ -20,57 +20,80 @@ const LIVENESS_ACTIONS = [
 ];
 
 export const AttendanceModal: React.FC<AttendanceModalProps> = ({ isOpen, mode, onClose, onSuccess }) => {
-  const videoRef = useRef<HTMLVideoElement>(null);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const [step, setStep] = useState<Step>('PERMISSION');
   const [currentAction, setCurrentAction] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
   const [stream, setStream] = useState<MediaStream | null>(null);
+  const [facingMode, setFacingMode] = useState<'user' | 'environment'>('user');
+  const [isVideoReady, setIsVideoReady] = useState(false);
 
+  // Initialize/Cleanup when modal opens/closes
   useEffect(() => {
     if (isOpen) {
-      startProcess();
+      setFacingMode('user'); // Default to front camera
+      startProcess('user');
     } else {
       stopCamera();
     }
     return () => stopCamera();
   }, [isOpen]);
 
+  // Attach stream to video element
+  useEffect(() => {
+    if (stream && videoRef.current) {
+      videoRef.current.srcObject = stream;
+      // Critical for mobile browsers:
+      videoRef.current.setAttribute('playsinline', 'true'); 
+      videoRef.current.play().catch(e => console.warn("Auto-play failed:", e));
+    }
+  }, [stream]);
+
   const stopCamera = () => {
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
     if (stream) {
       stream.getTracks().forEach(track => track.stop());
       setStream(null);
     }
     setStep('PERMISSION');
+    setIsVideoReady(false);
   };
 
-  const startProcess = async () => {
+  const startProcess = async (targetMode: 'user' | 'environment' = facingMode) => {
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    
+    // Stop existing stream first
+    if (stream) {
+      stream.getTracks().forEach(track => track.stop());
+      setStream(null);
+    }
+
     setStep('CAMERA_INIT');
     setErrorMsg("");
+    setIsVideoReady(false);
     
     try {
-      // 1. Get Camera - REMOVED resolution constraints which fail on mobile
+      // Simplified constraints to avoid "OverconstrainedError" which can sometimes cause issues on specific devices
       const mediaStream = await navigator.mediaDevices.getUserMedia({ 
-        video: { facingMode: 'user' },
+        video: { facingMode: targetMode },
         audio: false 
       });
-      setStream(mediaStream);
       
-      if (videoRef.current) {
-        videoRef.current.srcObject = mediaStream;
-      }
+      setStream(mediaStream); 
 
-      // Wait for video to load then start liveness
-      setTimeout(() => {
+      // Wait a bit before starting liveness check to give user time to position themselves
+      timeoutRef.current = setTimeout(() => {
         setStep('LIVENESS');
         setCurrentAction(LIVENESS_ACTIONS[Math.floor(Math.random() * LIVENESS_ACTIONS.length)]);
         simulateLivenessCheck();
-      }, 1500);
+      }, 2000);
 
     } catch (err: any) {
       console.error("Camera Error:", err);
       setStep('ERROR');
-      // Provide more specific feedback
       if (err.name === 'NotAllowedError') {
         setErrorMsg("Permission denied. Please allow camera access in your browser settings.");
       } else if (err.name === 'NotFoundError') {
@@ -81,6 +104,16 @@ export const AttendanceModal: React.FC<AttendanceModalProps> = ({ isOpen, mode, 
         setErrorMsg(`Camera error: ${err.message || 'Unknown error'}`);
       }
     }
+  };
+
+  const toggleCamera = () => {
+    const newMode = facingMode === 'user' ? 'environment' : 'user';
+    setFacingMode(newMode);
+    startProcess(newMode);
+  };
+
+  const handleVideoPlaying = () => {
+    setIsVideoReady(true);
   };
 
   const simulateLivenessCheck = () => {
@@ -103,12 +136,16 @@ export const AttendanceModal: React.FC<AttendanceModalProps> = ({ isOpen, mode, 
       if (videoRef.current && canvasRef.current) {
         const video = videoRef.current;
         const canvas = canvasRef.current;
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-        const ctx = canvas.getContext('2d');
-        if (ctx) {
-          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-          photoUrl = canvas.toDataURL('image/jpeg', 0.8);
+        
+        // Ensure valid dimensions
+        if (video.videoWidth > 0 && video.videoHeight > 0) {
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            const ctx = canvas.getContext('2d');
+            if (ctx) {
+              ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+              photoUrl = canvas.toDataURL('image/jpeg', 0.8);
+            }
         }
       }
 
@@ -119,7 +156,6 @@ export const AttendanceModal: React.FC<AttendanceModalProps> = ({ isOpen, mode, 
       });
 
       // 3. Mock Reverse Geocode & Weather
-      // In a real app, you would call Google Maps API and OpenWeather API here
       const mockLocations = ["Sector 4, Tech Park", "Downtown Avenue", "Industrial Zone B", "Main Street, North"];
       const mockWeathers = ["Sunny, 28°C", "Cloudy, 24°C", "Rainy, 22°C", "Clear, 30°C"];
       
@@ -139,7 +175,7 @@ export const AttendanceModal: React.FC<AttendanceModalProps> = ({ isOpen, mode, 
             }
           });
         }, 1000);
-      }, 1500); // Simulate API verification time
+      }, 1500); 
 
     } catch (err) {
       console.error(err);
@@ -155,7 +191,7 @@ export const AttendanceModal: React.FC<AttendanceModalProps> = ({ isOpen, mode, 
       <div className="w-full max-w-sm bg-slate-900 rounded-3xl overflow-hidden shadow-2xl border border-slate-700 relative flex flex-col max-h-[90vh]">
         
         {/* Header */}
-        <div className="p-4 flex items-center justify-between border-b border-slate-800">
+        <div className="p-4 flex items-center justify-between border-b border-slate-800 z-50 bg-slate-900">
           <h3 className="text-white font-semibold flex items-center gap-2">
             <ScanFace className="w-5 h-5 text-primary" />
             {mode === 'IN' ? 'Punch In Verification' : 'Punch Out Verification'}
@@ -166,20 +202,20 @@ export const AttendanceModal: React.FC<AttendanceModalProps> = ({ isOpen, mode, 
         </div>
 
         {/* Content */}
-        <div className="flex-1 relative bg-black flex flex-col items-center justify-center min-h-[400px]">
+        <div className="flex-1 relative bg-black flex flex-col min-h-[400px]">
           
           {step === 'ERROR' ? (
-            <div className="text-center p-6 space-y-4">
+             <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-6 space-y-4 z-40 bg-slate-900">
               <div className="w-16 h-16 rounded-full bg-red-500/10 flex items-center justify-center mx-auto">
                 <X className="w-8 h-8 text-red-500" />
               </div>
               <p className="text-white font-medium text-sm px-4">{errorMsg}</p>
-              <Button variant="outline" onClick={startProcess} className="bg-slate-800 text-white border-slate-700 hover:bg-slate-700">
+              <Button variant="outline" onClick={() => startProcess()} className="bg-slate-800 text-white border-slate-700 hover:bg-slate-700">
                 <RefreshCw className="w-4 h-4" /> Try Again
               </Button>
             </div>
           ) : step === 'SUCCESS' ? (
-             <div className="text-center p-6 space-y-4 animate-in zoom-in-95">
+             <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-6 space-y-4 z-40 bg-slate-900 animate-in zoom-in-95">
               <div className="w-20 h-20 rounded-full bg-green-500/20 flex items-center justify-center mx-auto border-2 border-green-500">
                 <CheckCircle2 className="w-10 h-10 text-green-500" />
               </div>
@@ -187,27 +223,42 @@ export const AttendanceModal: React.FC<AttendanceModalProps> = ({ isOpen, mode, 
               <p className="text-slate-400 text-sm">Attendance logged successfully.</p>
             </div>
           ) : (
-            <div className="relative w-full h-full flex flex-col items-center overflow-hidden">
-              {/* Camera Feed */}
+            <div className="relative w-full h-full flex-1">
+              
+              {/* Video Element - Absolute to fill container */}
               <video 
                 ref={videoRef} 
                 autoPlay 
                 playsInline 
-                muted 
-                className={`w-full h-full object-cover absolute inset-0 transition-opacity duration-500 ${step === 'CAMERA_INIT' ? 'opacity-0' : 'opacity-100'}`}
+                muted
+                onPlaying={handleVideoPlaying}
+                onLoadedMetadata={() => videoRef.current?.play()}
+                className={`absolute inset-0 w-full h-full object-cover ${facingMode === 'user' ? 'scale-x-[-1]' : ''}`}
+                style={{ transform: facingMode === 'user' ? 'scaleX(-1)' : 'none' }} 
               />
               <canvas ref={canvasRef} className="hidden" />
 
-              {/* Loading State for Camera Init */}
-              {step === 'CAMERA_INIT' && (
-                <div className="absolute inset-0 flex flex-col items-center justify-center z-10">
+              {/* Loading Overlay - Visible only when video is NOT ready */}
+              {!isVideoReady && (
+                <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-slate-900">
                    <Loader2 className="w-10 h-10 text-primary animate-spin mb-4" />
-                   <p className="text-slate-400 text-sm">Initializing Camera...</p>
+                   <p className="text-slate-400 text-sm">Accessing Camera...</p>
                 </div>
               )}
 
-              {/* Face Mesh Overlay Simulation */}
-              {(step === 'LIVENESS' || step === 'VERIFYING') && (
+              {/* Camera Switch Button - Visible only when video IS ready */}
+              {isVideoReady && step !== 'VERIFYING' && (
+                <button 
+                  onClick={toggleCamera}
+                  className="absolute top-4 right-4 z-30 p-2.5 rounded-full bg-black/40 text-white hover:bg-black/60 backdrop-blur-md transition-all active:scale-95 border border-white/10"
+                  title="Switch Camera"
+                >
+                  <RefreshCw className="w-5 h-5" />
+                </button>
+              )}
+
+              {/* Liveness/Tech Overlay - Visible only when video IS ready */}
+              {isVideoReady && (step === 'LIVENESS' || step === 'VERIFYING') && (
                 <div className="absolute inset-0 pointer-events-none z-10">
                   <div className="w-64 h-64 border-2 border-primary/50 rounded-full absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 shadow-[0_0_30px_rgba(99,102,241,0.3)] animate-pulse"></div>
                   <div className="w-60 h-60 border border-white/20 rounded-full absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2"></div>
@@ -224,7 +275,10 @@ export const AttendanceModal: React.FC<AttendanceModalProps> = ({ isOpen, mode, 
               )}
 
               {/* Instructions Overlay */}
-              <div className="absolute bottom-8 left-4 right-4 bg-black/60 backdrop-blur-md p-4 rounded-xl border border-white/10 z-20 text-center">
+              <div className="absolute bottom-8 left-4 right-4 bg-black/60 backdrop-blur-md p-4 rounded-xl border border-white/10 z-20 text-center transition-all duration-300">
+                {step === 'CAMERA_INIT' && (
+                   <p className="text-slate-300 font-medium text-sm animate-pulse">Starting camera...</p>
+                )}
                 {step === 'LIVENESS' && (
                   <div className="space-y-1 animate-in slide-in-from-bottom-2">
                     <p className="text-primary font-bold uppercase tracking-wider text-xs">Liveness Check</p>
