@@ -1,9 +1,10 @@
+
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, MapPin, Clock, Car, Bike, Bus, Building2, Undo2, Flag } from 'lucide-react';
+import { ArrowLeft, MapPin, Clock, Car, Bike, Bus, Building2, Undo2, Flag, HelpCircle } from 'lucide-react';
 import { Button } from '../components/FormElements';
 import { TourEndModal } from '../components/TourEndModal';
-import { Tour, RoutePath, TourPhase } from '../types';
+import { Tour, RoutePath, TourPhase, Site } from '../types';
 
 export const ActiveTourPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -56,7 +57,7 @@ export const ActiveTourPage: React.FC = () => {
     return () => clearInterval(interval);
   }, [tour, currentPhase]);
 
-  const handleCheckpointSuccess = (data: { selfieUrl: string, location: any }) => {
+  const handleCheckpointSuccess = (data: { selfieUrl: string, location: any, newSite?: Site }) => {
     if (!tour) return;
     
     const savedTours = JSON.parse(localStorage.getItem('tours_data') || '[]');
@@ -71,6 +72,13 @@ export const ActiveTourPage: React.FC = () => {
             siteArrivalTime: new Date().toISOString(),
             siteArrivalSelfieUrl: data.selfieUrl
         };
+        
+        // If a new site was defined, update the tour destination details
+        if (data.newSite) {
+          updatedTour.toLocation = data.newSite.name;
+          updatedTour.toCoordinates = data.newSite.coordinates;
+        }
+
         setCurrentPhase('ON_SITE');
     } 
     else if (currentPhase === 'ON_SITE') {
@@ -115,6 +123,9 @@ export const ActiveTourPage: React.FC = () => {
     return 'Traveling to Site';
   };
 
+  // Determine if location is known
+  const hasDestination = tour && tour.toCoordinates && tour.toCoordinates.lat !== 0;
+
   if (!tour) return null;
 
   return (
@@ -139,24 +150,26 @@ export const ActiveTourPage: React.FC = () => {
         {/* Mock Map Background */}
         <div className="absolute inset-0 bg-[#e5e7eb] opacity-50 bg-[radial-gradient(#cbd5e1_1px,transparent_1px)] [background-size:16px_16px]"></div>
         
-        {/* Route Line SVG - Flip direction for Return */}
-        <svg className={`absolute inset-0 w-full h-full pointer-events-none transition-transform duration-500 ${currentPhase === 'RETURN' ? 'scale-x-[-1]' : ''}`}>
-          <path 
-            d="M 50 350 Q 150 200 300 50" 
-            fill="none" 
-            stroke={currentPhase === 'ON_SITE' ? '#14b8a6' : '#6366f1'} 
-            strokeWidth="4" 
-            strokeDasharray={currentPhase === 'ON_SITE' ? '0' : '8 4'}
-            className={currentPhase !== 'ON_SITE' ? "animate-[dash_20s_linear_infinite]" : ""} 
-          />
-          <style>{`
-            @keyframes dash {
-              to {
-                stroke-dashoffset: -100;
+        {/* Route Line SVG - Flip direction for Return. Only show if we know where we are going! */}
+        {hasDestination && (
+          <svg className={`absolute inset-0 w-full h-full pointer-events-none transition-transform duration-500 ${currentPhase === 'RETURN' ? 'scale-x-[-1]' : ''}`}>
+            <path 
+              d="M 50 350 Q 150 200 300 50" 
+              fill="none" 
+              stroke={currentPhase === 'ON_SITE' ? '#14b8a6' : '#6366f1'} 
+              strokeWidth="4" 
+              strokeDasharray={currentPhase === 'ON_SITE' ? '0' : '8 4'}
+              className={currentPhase !== 'ON_SITE' ? "animate-[dash_20s_linear_infinite]" : ""} 
+            />
+            <style>{`
+              @keyframes dash {
+                to {
+                  stroke-dashoffset: -100;
+                }
               }
-            }
-          `}</style>
-        </svg>
+            `}</style>
+          </svg>
+        )}
 
         {/* Start Marker */}
         <div className="absolute bottom-10 left-8 flex flex-col items-center">
@@ -169,18 +182,24 @@ export const ActiveTourPage: React.FC = () => {
         {/* End Marker */}
         <div className="absolute top-10 right-8 flex flex-col items-center">
              <div className={`w-8 h-8 ${currentPhase === 'ON_SITE' ? 'bg-teal-500' : 'bg-white text-primary'} rounded-full flex items-center justify-center shadow-lg border-2 border-white ${currentPhase !== 'ON_SITE' ? 'animate-bounce' : ''}`}>
-                <MapPin className={`w-5 h-5 ${currentPhase === 'ON_SITE' ? 'text-white' : 'fill-current'}`} />
+                {hasDestination ? (
+                  <MapPin className={`w-5 h-5 ${currentPhase === 'ON_SITE' ? 'text-white' : 'fill-current'}`} />
+                ) : (
+                  <HelpCircle className="w-5 h-5 text-slate-400" />
+                )}
              </div>
-             <div className="bg-white px-2 py-1 rounded shadow text-[10px] font-bold text-primary whitespace-nowrap mt-1">
+             <div className="bg-white px-2 py-1 rounded shadow text-[10px] font-bold text-primary whitespace-nowrap mt-1 max-w-[120px] truncate">
                 {tour.toLocation}
             </div>
         </div>
 
         {/* User Location Marker (Movement Logic) */}
+        {/* If destination unknown, we keep the user in the middle moving slightly */}
         <div className={`absolute transition-all duration-1000 ${
+            !hasDestination && currentPhase === 'OUTWARD' ? 'top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 animate-pulse' :
             currentPhase === 'OUTWARD' ? 'top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2' :
             currentPhase === 'ON_SITE' ? 'top-10 right-8 translate-x-2 -translate-y-2' :
-            'top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2' // Return (visual hack for demo, ideally animates back)
+            'top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2' 
         }`}>
              {currentPhase !== 'ON_SITE' && (
                <div className={`w-12 h-12 ${currentPhase === 'RETURN' ? 'bg-orange-500/20' : 'bg-primary/20'} rounded-full flex items-center justify-center animate-ping absolute`}></div>
@@ -212,7 +231,7 @@ export const ActiveTourPage: React.FC = () => {
                   <p className="text-xl font-mono font-bold text-slate-900">{elapsedTime}</p>
                </div>
             </div>
-            {currentPhase !== 'ON_SITE' && (
+            {currentPhase !== 'ON_SITE' && hasDestination && (
               <div className="text-right">
                  <p className="text-xs text-slate-400 uppercase font-bold tracking-wider">Distance</p>
                  <p className="text-xl font-bold text-slate-900">
@@ -220,11 +239,19 @@ export const ActiveTourPage: React.FC = () => {
                  </p>
               </div>
             )}
+            {/* If unknown destination, show tracking indicator instead of distance */}
+            {currentPhase !== 'ON_SITE' && !hasDestination && (
+               <div className="text-right">
+                 <p className="text-xs text-slate-400 uppercase font-bold tracking-wider">Tracking</p>
+                 <p className="text-sm font-bold text-primary animate-pulse">GPS Active</p>
+               </div>
+            )}
          </div>
 
          {currentPhase === 'OUTWARD' && (
             <Button onClick={() => setShowActionModal(true)} className="py-4 bg-teal-600 hover:bg-teal-700 shadow-teal-100">
-               <Building2 className="w-5 h-5" /> Mark Arrival
+               <Building2 className="w-5 h-5" /> 
+               {hasDestination ? 'Mark Arrival' : 'Arrived - Define Site'}
             </Button>
          )}
 

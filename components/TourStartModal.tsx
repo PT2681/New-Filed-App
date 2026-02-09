@@ -1,8 +1,9 @@
+
 import React, { useRef, useState, useEffect, useCallback } from 'react';
-import { X, Camera, Car, Bike, Bus, MapPin, User, Users, Video, Cloud, Sun, ToggleLeft, ToggleRight, ArrowRight, CheckCircle2, Scan, Loader2, ScanFace, CloudRain, RefreshCw } from 'lucide-react';
+import { X, Camera, Car, Bike, Bus, MapPin, User, Users, Video, Cloud, Sun, ToggleLeft, ToggleRight, ArrowRight, CheckCircle2, Scan, Loader2, ScanFace, CloudRain, RefreshCw, Search, PlusCircle } from 'lucide-react';
 import { Button, Input } from './FormElements';
-import { Tour, TransportMode, TravelType, PoolRole } from '../types';
-import { MOCK_PROJECTS } from '../constants';
+import { Tour, TransportMode, TravelType, PoolRole, Site } from '../types';
+import { MOCK_PROJECTS, MOCK_SITES } from '../constants';
 
 interface TourStartModalProps {
   isOpen: boolean;
@@ -42,7 +43,14 @@ export const TourStartModal: React.FC<TourStartModalProps> = ({
   const [selectedProjectId, setSelectedProjectId] = useState(tour.projectId || "");
   const [taskName, setTaskName] = useState(tour.taskName || "");
   const [customPurpose, setCustomPurpose] = useState("");
+  
+  // Location State
   const [mapLocation, setMapLocation] = useState(tour.toLocation || "");
+  const [toCoordinates, setToCoordinates] = useState<{lat: number, lng: number} | null>(tour.toCoordinates || null);
+  const [siteSearch, setSiteSearch] = useState("");
+  const [knownSites, setKnownSites] = useState<Site[]>([]);
+  const [isUnknownLocation, setIsUnknownLocation] = useState(false);
+
   const [selfiePhoto, setSelfiePhoto] = useState<string | null>(null);
 
   // Liveness State
@@ -60,6 +68,12 @@ export const TourStartModal: React.FC<TourStartModalProps> = ({
       setVideoFile(null);
       setPlatePhoto(null);
       setSelfiePhoto(null);
+      
+      // Initialize sites from storage or mock
+      const storedSites = localStorage.getItem('known_sites');
+      const sites = storedSites ? JSON.parse(storedSites) : MOCK_SITES;
+      setKnownSites(sites);
+
       detectWeather();
     } else {
       stopCamera();
@@ -194,6 +208,20 @@ export const TourStartModal: React.FC<TourStartModalProps> = ({
     setStep('LOCATION');
   };
 
+  const handleSiteSelect = (site: Site) => {
+    setMapLocation(site.name);
+    setToCoordinates(site.coordinates);
+    setSiteSearch(site.name);
+    setIsUnknownLocation(false);
+  };
+
+  const handleUnknownLocation = () => {
+    setMapLocation("Unknown Location (Define on Arrival)");
+    setToCoordinates(null);
+    setIsUnknownLocation(true);
+    setSiteSearch("");
+  };
+
   const handleNextFromLocation = () => {
     setStep('SELFIE_INIT');
     startCamera('user');
@@ -216,6 +244,7 @@ export const TourStartModal: React.FC<TourStartModalProps> = ({
       taskName,
       taskDescription: customPurpose,
       toLocation: mapLocation,
+      toCoordinates: toCoordinates,
       vehiclePlateUrl: platePhoto!,
       startSelfieUrl: selfiePhoto,
       surroundingVideoUrl: videoFile ? URL.createObjectURL(videoFile) : undefined,
@@ -227,6 +256,11 @@ export const TourStartModal: React.FC<TourStartModalProps> = ({
 
   // Check if current step is part of the Liveness flow
   const isLivenessStep = ['SELFIE_INIT', 'LIVENESS', 'VERIFYING', 'CAPTURED'].includes(step);
+
+  const filteredSites = knownSites.filter(s => 
+    s.name.toLowerCase().includes(siteSearch.toLowerCase()) || 
+    s.category.toLowerCase().includes(siteSearch.toLowerCase())
+  );
 
   if (!isOpen) return null;
 
@@ -499,23 +533,76 @@ export const TourStartModal: React.FC<TourStartModalProps> = ({
               )}
 
               {step === 'LOCATION' && (
-                <div className="space-y-4">
-                  <h4 className="font-bold text-lg text-slate-900">Destination</h4>
-                  <Input 
-                    label="Search Location"
-                    icon={MapPin}
-                    value={mapLocation}
-                    onChange={(e) => setMapLocation(e.target.value)}
-                    placeholder="Enter destination..."
-                  />
-                  <div className="h-48 bg-slate-200 rounded-xl flex items-center justify-center border border-slate-300">
-                    <p className="text-slate-500 text-sm flex items-center gap-2">
-                      <MapPin className="w-5 h-5" /> Map Preview (Mock)
-                    </p>
+                <div className="space-y-4 h-full flex flex-col">
+                  <div>
+                    <h4 className="font-bold text-lg text-slate-900">Destination</h4>
+                    <p className="text-sm text-slate-500">Where are you heading today?</p>
                   </div>
-                  <Button disabled={!mapLocation} onClick={handleNextFromLocation}>
-                    Continue <ArrowRight className="w-4 h-4" />
-                  </Button>
+                  
+                  {/* Search / Selection UI */}
+                  <div className="relative">
+                    <Input 
+                      placeholder="Search Known Sites..."
+                      icon={Search}
+                      value={siteSearch}
+                      onChange={(e) => {
+                        setSiteSearch(e.target.value);
+                        if (isUnknownLocation) setIsUnknownLocation(false);
+                      }}
+                      className={isUnknownLocation ? "opacity-50" : ""}
+                    />
+                  </div>
+
+                  {/* Suggestions List */}
+                  {!isUnknownLocation && siteSearch && filteredSites.length > 0 && (
+                    <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden max-h-40 overflow-y-auto">
+                      {filteredSites.map(site => (
+                        <button
+                          key={site.id}
+                          onClick={() => handleSiteSelect(site)}
+                          className="w-full text-left px-4 py-3 hover:bg-slate-50 flex items-center justify-between border-b border-slate-50 last:border-0"
+                        >
+                          <div>
+                            <p className="font-semibold text-sm text-slate-900">{site.name}</p>
+                            <p className="text-[10px] text-slate-500 uppercase">{site.category}</p>
+                          </div>
+                          <CheckCircle2 className={`w-4 h-4 ${mapLocation === site.name ? 'text-primary' : 'text-slate-300'}`} />
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Or Divider */}
+                  <div className="flex items-center gap-3 py-2">
+                    <div className="h-px bg-slate-200 flex-1"></div>
+                    <span className="text-xs text-slate-400 font-medium">OR</span>
+                    <div className="h-px bg-slate-200 flex-1"></div>
+                  </div>
+
+                  {/* Start New/Unknown Button */}
+                  <button
+                    onClick={handleUnknownLocation}
+                    className={`w-full p-4 rounded-xl border-2 border-dashed flex items-center gap-3 transition-all ${
+                      isUnknownLocation 
+                        ? 'border-primary bg-indigo-50 text-primary' 
+                        : 'border-slate-300 hover:border-slate-400 text-slate-500 hover:bg-slate-50'
+                    }`}
+                  >
+                    <div className={`p-2 rounded-full ${isUnknownLocation ? 'bg-primary text-white' : 'bg-slate-200 text-slate-500'}`}>
+                      <PlusCircle className="w-5 h-5" />
+                    </div>
+                    <div className="text-left">
+                      <p className="font-bold text-sm">Start New / Unknown Location</p>
+                      <p className="text-xs opacity-80">Define site details upon arrival</p>
+                    </div>
+                    {isUnknownLocation && <CheckCircle2 className="w-5 h-5 ml-auto" />}
+                  </button>
+
+                  <div className="mt-auto">
+                    <Button disabled={!mapLocation} onClick={handleNextFromLocation}>
+                      Continue <ArrowRight className="w-4 h-4" />
+                    </Button>
+                  </div>
                 </div>
               )}
             </div>

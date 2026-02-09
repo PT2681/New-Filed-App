@@ -58,6 +58,16 @@ export interface Project {
   visitsCompleted: number;
 }
 
+export interface Site {
+  id: string;
+  name: string;
+  category: string;
+  coordinates: {
+    lat: number;
+    lng: number;
+  };
+}
+
 export type TrainingRole = 'TRAINEE' | 'TRAINER';
 export type TrainingStatus = 'Due' | 'In Progress' | 'Completed' | 'Cancelled';
 
@@ -95,7 +105,7 @@ export interface Tour {
   taskDescription?: string;
   fromLocation: string;
   toLocation: string;
-  toCoordinates: { lat: number; lng: number };
+  toCoordinates?: { lat: number; lng: number } | null; // Made optional/nullable
   startDate: string; // Scheduled start
   endDate: string; // Scheduled end
   status: TourStatus;

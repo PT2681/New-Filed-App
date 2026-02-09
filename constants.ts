@@ -1,4 +1,5 @@
-import { Feature, Project, TrainingSession, Tour, Notification, LeaveRequest } from './types';
+
+import { Feature, Project, TrainingSession, Tour, Notification, LeaveRequest, Site } from './types';
 
 export const APP_NAME = 'Nexby Field-Force Pro';
 
@@ -31,6 +32,33 @@ export const FEATURES: Feature[] = [
     iconName: 'HeartHandshake',
     color: 'bg-rose-100 text-rose-600',
   },
+];
+
+export const MOCK_SITES: Site[] = [
+  {
+    id: 'S-1',
+    name: 'Sector 4, North Zone',
+    category: 'Client Site',
+    coordinates: { lat: 37.7749, lng: -122.4194 }
+  },
+  {
+    id: 'S-2',
+    name: 'Industrial Park Block C',
+    category: 'Warehouse',
+    coordinates: { lat: 37.7849, lng: -122.4294 }
+  },
+  {
+    id: 'S-3',
+    name: 'City Mall Complex',
+    category: 'Commercial',
+    coordinates: { lat: 37.7649, lng: -122.4094 }
+  },
+  {
+    id: 'S-4',
+    name: 'Headquarters',
+    category: 'Office',
+    coordinates: { lat: 37.7949, lng: -122.3994 }
+  }
 ];
 
 export const MOCK_PROJECTS: Project[] = [

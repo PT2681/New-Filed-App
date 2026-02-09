@@ -1,17 +1,19 @@
+
 import React, { useRef, useState, useEffect, useCallback } from 'react';
-import { X, MapPin, Loader2, AlertTriangle, Building2, Undo2, Flag, ScanFace, CheckCircle2 } from 'lucide-react';
-import { Button } from './FormElements';
-import { Tour, TourPhase } from '../types';
+import { X, MapPin, Loader2, AlertTriangle, Building2, Undo2, Flag, ScanFace, CheckCircle2, Save } from 'lucide-react';
+import { Button, Input } from './FormElements';
+import { Tour, TourPhase, Site } from '../types';
+import { MOCK_SITES } from '../constants';
 
 interface TourEndModalProps {
   isOpen: boolean;
   tour: Tour;
   phase: TourPhase; // Current phase BEFORE action
   onClose: () => void;
-  onSuccess: (data: { selfieUrl: string, location: any }) => void;
+  onSuccess: (data: { selfieUrl: string, location: any, newSite?: Site }) => void;
 }
 
-type Step = 'LOCATION' | 'LIVENESS_INIT' | 'LIVENESS_ACTION' | 'VERIFYING' | 'CAPTURED' | 'ERROR';
+type Step = 'LOCATION' | 'DEFINE_SITE' | 'LIVENESS_INIT' | 'LIVENESS_ACTION' | 'VERIFYING' | 'CAPTURED' | 'ERROR';
 
 const LIVENESS_ACTIONS = [
   "Blink your eyes twice",
@@ -51,6 +53,11 @@ export const TourEndModal: React.FC<TourEndModalProps> = ({
   const [isVideoReady, setIsVideoReady] = useState(false);
   const [livenessAction, setLivenessAction] = useState("");
 
+  // New Site Data
+  const [siteName, setSiteName] = useState("");
+  const [siteCategory, setSiteCategory] = useState("Client Site");
+  const [isNewSiteFlow, setIsNewSiteFlow] = useState(false);
+
   useEffect(() => {
     if (isOpen) {
       setStep('LOCATION');
@@ -86,20 +93,21 @@ export const TourEndModal: React.FC<TourEndModalProps> = ({
       const current = { lat: position.coords.latitude, lng: position.coords.longitude };
       setCoords(current);
 
-      // Verify Location based on phase
-      // Mock validation logic for demo
-      if (tour.toCoordinates.lat === 0) {
-        startCamera();
+      // Check if we need to define site
+      // Condition: Outward journey ends AND (no coordinates OR user flagged as unknown/new)
+      if (phase === 'OUTWARD' && (!tour.toCoordinates || !tour.toCoordinates.lat)) {
+        setIsNewSiteFlow(true);
+        setStep('DEFINE_SITE');
         return;
       }
 
-      const targetLat = phase === 'RETURN' ? current.lat : tour.toCoordinates.lat;
-      const targetLng = phase === 'RETURN' ? current.lng : tour.toCoordinates.lng;
+      const targetLat = phase === 'RETURN' ? current.lat : (tour.toCoordinates?.lat || current.lat);
+      const targetLng = phase === 'RETURN' ? current.lng : (tour.toCoordinates?.lng || current.lng);
 
       const dist = calculateDistance(current.lat, current.lng, targetLat, targetLng);
       setDistance(Math.round(dist));
 
-      // Proceed regardless of distance for demo (would be strict in prod)
+      // Proceed regardless of distance for demo
       setTimeout(() => {
           startCamera();
       }, 1000);
@@ -168,9 +176,36 @@ export const TourEndModal: React.FC<TourEndModalProps> = ({
     }
   };
 
+  const handleDefineSiteNext = () => {
+    if (siteName) {
+      startCamera();
+    }
+  };
+
   const handleFinalSubmit = () => {
       if (selfie && coords) {
-          onSuccess({ selfieUrl: selfie, location: coords });
+          let newSite: Site | undefined = undefined;
+          
+          if (isNewSiteFlow && siteName) {
+            newSite = {
+              id: `S-${Date.now()}`,
+              name: siteName,
+              category: siteCategory,
+              coordinates: coords
+            };
+            
+            // Persist new site to storage for future use
+            const storedSites = localStorage.getItem('known_sites');
+            const currentSites = storedSites ? JSON.parse(storedSites) : MOCK_SITES;
+            const updatedSites = [newSite, ...currentSites];
+            localStorage.setItem('known_sites', JSON.stringify(updatedSites));
+          }
+
+          onSuccess({ 
+            selfieUrl: selfie, 
+            location: coords,
+            newSite 
+          });
       }
   };
 
@@ -192,6 +227,54 @@ export const TourEndModal: React.FC<TourEndModalProps> = ({
                 <h3 className="font-bold text-lg">{getActionTitle()}</h3>
                 <p className="text-sm text-slate-500">Verifying GPS Location...</p>
              </div>
+          )}
+
+          {/* New Site Definition Step */}
+          {step === 'DEFINE_SITE' && (
+            <div className="absolute inset-0 bg-white flex flex-col p-6 space-y-4">
+               <div className="text-center mb-2">
+                 <div className="w-16 h-16 bg-indigo-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                   <MapPin className="w-8 h-8 text-primary" />
+                 </div>
+                 <h3 className="font-bold text-xl text-slate-900">New Location Detected</h3>
+                 <p className="text-sm text-slate-500 mt-1">
+                   You are arriving at a new site. Please save details for future visits.
+                 </p>
+               </div>
+               
+               <div className="space-y-4 flex-1">
+                 <Input 
+                   label="Site Name"
+                   placeholder="e.g. Sector 45 Tower A"
+                   value={siteName}
+                   onChange={(e) => setSiteName(e.target.value)}
+                   autoFocus
+                 />
+                 
+                 <div className="space-y-1.5">
+                   <label className="text-sm font-medium text-slate-700 ml-1">Category</label>
+                   <div className="grid grid-cols-2 gap-2">
+                     {['Client Site', 'Office', 'Warehouse', 'Field'].map(cat => (
+                       <button
+                         key={cat}
+                         onClick={() => setSiteCategory(cat)}
+                         className={`py-2 px-2 text-xs font-semibold rounded-lg border ${
+                           siteCategory === cat 
+                             ? 'bg-primary text-white border-primary' 
+                             : 'bg-white text-slate-600 border-slate-200'
+                         }`}
+                       >
+                         {cat}
+                       </button>
+                     ))}
+                   </div>
+                 </div>
+               </div>
+
+               <Button disabled={!siteName} onClick={handleDefineSiteNext}>
+                 Save & Verify Arrival
+               </Button>
+            </div>
           )}
 
           {/* Camera / Liveness Flow - Using flex-1 layout instead of absolute inset-0 overlay */}
@@ -251,9 +334,15 @@ export const TourEndModal: React.FC<TourEndModalProps> = ({
                     <h3 className="text-2xl font-bold text-white mb-2 flex items-center justify-center gap-2">
                       <CheckCircle2 className="w-8 h-8 text-green-500" /> Verified
                     </h3>
-                    <p className="text-slate-400 text-sm">Location and Identity Confirmed.</p>
+                    <p className="text-slate-400 text-sm">
+                      {isNewSiteFlow 
+                        ? "Site Saved. Identity Confirmed." 
+                        : "Location and Identity Confirmed."}
+                    </p>
                  </div>
-                 <Button onClick={handleFinalSubmit}>Confirm & Proceed</Button>
+                 <Button onClick={handleFinalSubmit}>
+                   {isNewSiteFlow ? "Confirm New Site" : "Confirm & Proceed"}
+                 </Button>
               </div>
           )}
 
