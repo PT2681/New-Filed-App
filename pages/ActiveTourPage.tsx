@@ -1,10 +1,10 @@
 
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, MapPin, Clock, Car, Bike, Bus, Building2, Undo2, Flag, HelpCircle } from 'lucide-react';
+import { ArrowLeft, MapPin, Clock, Car, Bike, Bus, Building2, Undo2, Flag, HelpCircle, History } from 'lucide-react';
 import { Button } from '../components/FormElements';
 import { TourEndModal } from '../components/TourEndModal';
-import { Tour, RoutePath, TourPhase, Site } from '../types';
+import { Tour, RoutePath, TourPhase, Site, VisitHistoryItem } from '../types';
 
 export const ActiveTourPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -57,11 +57,22 @@ export const ActiveTourPage: React.FC = () => {
     return () => clearInterval(interval);
   }, [tour, currentPhase]);
 
-  const handleCheckpointSuccess = (data: { selfieUrl: string, location: any, newSite?: Site }) => {
+  const handleCheckpointSuccess = (data: { 
+    selfieUrl: string, 
+    location: any, 
+    newSite?: Site, 
+    nextAction?: 'RETURN' | 'NEXT_SITE',
+    nextSiteDetails?: { name: string, coordinates: { lat: number, lng: number } | null }
+  }) => {
     if (!tour) return;
     
     const savedTours = JSON.parse(localStorage.getItem('tours_data') || '[]');
     let updatedTour = { ...tour };
+    
+    // Save original start location if not set (for return loop)
+    if (!updatedTour.originalStartLocation) {
+      updatedTour.originalStartLocation = updatedTour.fromLocation;
+    }
     
     // Logic Branch based on current phase
     if (currentPhase === 'OUTWARD') {
@@ -82,14 +93,42 @@ export const ActiveTourPage: React.FC = () => {
         setCurrentPhase('ON_SITE');
     } 
     else if (currentPhase === 'ON_SITE') {
-        // Transition to RETURN
-        updatedTour = {
-            ...updatedTour,
-            tourPhase: 'RETURN',
-            returnStartTime: new Date().toISOString(),
-            returnStartSelfieUrl: data.selfieUrl
+        // We are leaving the site.
+        // Save current site visit to history
+        const visitItem: VisitHistoryItem = {
+          siteName: tour.toLocation,
+          arrivalTime: tour.siteArrivalTime || new Date().toISOString(),
+          departureTime: new Date().toISOString(),
+          photoUrl: tour.siteArrivalSelfieUrl
         };
-        setCurrentPhase('RETURN');
+        const currentHistory = updatedTour.visitHistory || [];
+        updatedTour.visitHistory = [visitItem, ...currentHistory];
+
+        if (data.nextAction === 'NEXT_SITE' && data.nextSiteDetails) {
+           // --- NEXT LEG: Start a new OUTWARD phase ---
+           updatedTour = {
+             ...updatedTour,
+             tourPhase: 'OUTWARD',
+             fromLocation: tour.toLocation, // We are leaving current 'to'
+             toLocation: data.nextSiteDetails.name,
+             toCoordinates: data.nextSiteDetails.coordinates,
+             actualStartDate: new Date().toISOString(), // Restart travel timer
+             siteArrivalTime: undefined, // Clear these for next site
+             siteArrivalSelfieUrl: undefined
+           };
+           setCurrentPhase('OUTWARD');
+        } else {
+           // --- RETURN: Go back to base ---
+           updatedTour = {
+             ...updatedTour,
+             tourPhase: 'RETURN',
+             toLocation: updatedTour.originalStartLocation || 'Headquarters', // Reset destination visuals
+             toCoordinates: null, // Logic usually routes to base
+             returnStartTime: new Date().toISOString(),
+             returnStartSelfieUrl: data.selfieUrl
+           };
+           setCurrentPhase('RETURN');
+        }
     } 
     else if (currentPhase === 'RETURN') {
         // Transition to COMPLETED
@@ -98,8 +137,8 @@ export const ActiveTourPage: React.FC = () => {
             status: 'Completed',
             endSelfieUrl: data.selfieUrl,
             actualEndDate: new Date().toISOString(),
-            // Mock Distance: We assume return trip matches outward, so total = 12.4 * 2
-            distanceCovered: 24.8 
+            // Mock Distance: Add logic to accumulate distance if needed
+            distanceCovered: (updatedTour.distanceCovered || 0) + 12.4 
         };
         navigate(RoutePath.TOURS);
     }
@@ -231,14 +270,7 @@ export const ActiveTourPage: React.FC = () => {
                   <p className="text-xl font-mono font-bold text-slate-900">{elapsedTime}</p>
                </div>
             </div>
-            {currentPhase !== 'ON_SITE' && hasDestination && (
-              <div className="text-right">
-                 <p className="text-xs text-slate-400 uppercase font-bold tracking-wider">Distance</p>
-                 <p className="text-xl font-bold text-slate-900">
-                    {currentPhase === 'RETURN' ? '24.8' : '12.4'} <span className="text-sm font-normal text-slate-500">km</span>
-                 </p>
-              </div>
-            )}
+            
             {/* If unknown destination, show tracking indicator instead of distance */}
             {currentPhase !== 'ON_SITE' && !hasDestination && (
                <div className="text-right">
@@ -247,6 +279,14 @@ export const ActiveTourPage: React.FC = () => {
                </div>
             )}
          </div>
+        
+         {/* History / Previous Stops */}
+         {tour.visitHistory && tour.visitHistory.length > 0 && (
+            <div className="flex items-center gap-2 text-xs text-slate-500 bg-slate-50 p-2 rounded-lg">
+               <History className="w-4 h-4 text-slate-400" />
+               <span>{tour.visitHistory.length} previous stops completed.</span>
+            </div>
+         )}
 
          {currentPhase === 'OUTWARD' && (
             <Button onClick={() => setShowActionModal(true)} className="py-4 bg-teal-600 hover:bg-teal-700 shadow-teal-100">
@@ -257,13 +297,13 @@ export const ActiveTourPage: React.FC = () => {
 
          {currentPhase === 'ON_SITE' && (
             <Button onClick={() => setShowActionModal(true)} className="py-4 bg-orange-600 hover:bg-orange-700 shadow-orange-100">
-               <Undo2 className="w-5 h-5" /> Start Return Journey
+               <Undo2 className="w-5 h-5" /> Depart / Next Stop
             </Button>
          )}
 
          {currentPhase === 'RETURN' && (
             <Button variant="danger" onClick={() => setShowActionModal(true)} className="py-4 shadow-red-100">
-                <Flag className="w-5 h-5" /> End Trip
+                <Flag className="w-5 h-5" /> End Trip at Base
             </Button>
          )}
 

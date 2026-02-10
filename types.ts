@@ -97,6 +97,13 @@ export type TravelType = 'Individual' | 'Pool';
 export type PoolRole = 'Driver' | 'Passenger';
 export type TourPhase = 'OUTWARD' | 'ON_SITE' | 'RETURN';
 
+export interface VisitHistoryItem {
+  siteName: string;
+  arrivalTime: string;
+  departureTime: string;
+  photoUrl?: string;
+}
+
 export interface Tour {
   id: string;
   projectId: string;
@@ -139,6 +146,10 @@ export interface Tour {
   // Claim Details
   claimStatus?: ClaimStatus;
   claimAmount?: number;
+  
+  // Multi-stop support
+  visitHistory?: VisitHistoryItem[];
+  originalStartLocation?: string; // To remember where we started if we have multiple stops
 }
 
 export type NotificationType = 'PROJECT_ASSIGNED' | 'TRAINING_ASSIGNED' | 'CLAIM_PAID' | 'LEAVE_UPDATE' | 'ADVANCE_UPDATE' | 'GENERAL';
